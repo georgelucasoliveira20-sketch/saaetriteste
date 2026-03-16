@@ -1,0 +1,2783 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Controle Interno — SAAETRI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --blue-900: #002b52;
+            --blue-800: #004b87;
+            --blue-700: #0062b0;
+            --blue-500: #0073cc;
+            --blue-200: #b3d4f0;
+            --blue-100: #deeeff;
+            --blue-50:  #f0f7ff;
+            --green:    #1a7f4b;
+            --amber:    #b45309;
+            --red:      #c0392b;
+            --gray-900: #1a1f2e;
+            --gray-700: #374151;
+            --gray-500: #6b7280;
+            --gray-300: #d1d5db;
+            --gray-100: #f3f5f8;
+            --gray-50:  #f9fafb;
+            --white:    #ffffff;
+            --radius:   10px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+            --shadow:    0 4px 16px rgba(0,0,0,.08);
+            --shadow-lg: 0 8px 32px rgba(0,75,135,.12);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            min-height: 100vh;
+        }
+
+        /* ── TOP BAR ────────────────────────────── */
+        .topbar {
+            background: var(--blue-900);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            height: 64px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 12px rgba(0,0,0,.2);
+        }
+        .topbar-logo img { height: 36px; display: block; filter: brightness(0) invert(1); }
+        .topbar-title { color: var(--blue-200); font-size: .8rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+        .topbar-tabs { display: flex; gap: 4px; }
+        .tab-btn {
+            padding: 8px 20px; font-family: inherit; font-size: .875rem; font-weight: 600;
+            border: none; border-radius: 6px; cursor: pointer;
+            color: var(--blue-200); background: transparent;
+            transition: background .2s, color .2s;
+        }
+        .tab-btn:hover { background: rgba(255,255,255,.08); color: white; }
+        .tab-btn.active { background: var(--blue-500); color: white; }
+
+        /* ── LAYOUT ─────────────────────────────── */
+        .page { display: none; padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
+        .page.active { display: block; }
+        /* Garante que só page-form aparece inicialmente */
+        #page-list, #page-prazos, #page-cnpj { display: none; }
+
+        /* ── ACTION BAR ─────────────────────────── */
+        .action-bar {
+            display: flex; align-items: center; gap: 10px;
+            justify-content: flex-end; margin-bottom: 24px;
+        }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; font-family: inherit; font-size: .875rem; font-weight: 600;
+            border: none; border-radius: 8px; cursor: pointer;
+            transition: filter .2s, transform .15s;
+        }
+        .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn-primary   { background: var(--blue-800); color: white; }
+        .btn-success   { background: var(--green);   color: white; }
+        .btn-danger    { background: var(--red);     color: white; }
+        .btn-excel     { background: #1a6b3c;        color: white; }
+        .btn-ghost {
+            background: transparent; color: var(--gray-500); border: 1.5px solid var(--gray-300);
+        }
+        .btn-ghost:hover { background: var(--gray-50); color: var(--gray-700); filter: none; }
+
+        #loader {
+            display: none; font-size: .85rem; font-weight: 600;
+            color: var(--blue-700); align-items: center; gap: 8px;
+        }
+        #loader.visible { display: flex; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { width: 16px; height: 16px; border: 2px solid var(--blue-200); border-top-color: var(--blue-700); border-radius: 50%; animation: spin .7s linear infinite; }
+
+        /* ── STATS ROW ──────────────────────────── */
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card {
+            background: var(--white); border-radius: var(--radius); padding: 20px 22px;
+            box-shadow: var(--shadow-sm); border-top: 3px solid var(--blue-500);
+        }
+        .stat-card .label { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); }
+        .stat-card .value { font-size: 2rem; font-weight: 700; color: var(--blue-800); line-height: 1; margin: 8px 0 0; font-family: 'IBM Plex Mono', monospace; }
+        .stat-card.wide { grid-column: span 2; }
+        .stat-card .progress-wrap { margin-top: 12px; background: var(--gray-100); border-radius: 99px; height: 8px; overflow: hidden; }
+        .stat-card .progress-fill { height: 100%; background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-radius: 99px; transition: width .5s ease; }
+
+        /* ── MAIN GRID ──────────────────────────── */
+        .main-grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+
+        /* ── CARDS ──────────────────────────────── */
+        .card {
+            background: var(--white); border-radius: var(--radius);
+            box-shadow: var(--shadow); padding: 24px; margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 1rem; font-weight: 700; color: var(--blue-900);
+            padding-bottom: 14px; margin-bottom: 20px;
+            border-bottom: 1.5px solid var(--gray-100);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .card-title span { display: flex; align-items: center; gap: 8px; }
+
+        /* ── FORM FIELDS ────────────────────────── */
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: .8rem; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; letter-spacing: .02em; }
+        .field input, .field textarea, .field select {
+            width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-300);
+            border-radius: 7px; font-family: inherit; font-size: .9rem; color: var(--gray-900);
+            background: var(--gray-50); transition: border-color .2s, background .2s;
+        }
+        .field input:focus, .field textarea:focus, .field select:focus {
+            outline: none; border-color: var(--blue-500); background: white;
+            box-shadow: 0 0 0 3px rgba(0,115,204,.1);
+        }
+        .field textarea { height: 80px; resize: vertical; }
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        /* ── CHECKLIST ──────────────────────────── */
+        .phase-header { display: flex; align-items: center; justify-content: space-between; }
+        .btn-auto {
+            font-family: inherit; font-size: .78rem; font-weight: 700;
+            padding: 5px 12px; background: var(--blue-50); color: var(--blue-700);
+            border: 1.5px solid var(--blue-200); border-radius: 6px; cursor: pointer;
+            transition: background .2s; white-space: nowrap;
+        }
+        .btn-auto:hover { background: var(--blue-100); }
+
+        .check-group { margin-bottom: 6px; }
+        .checklist-item {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 11px 14px; border: 1.5px solid var(--gray-200);
+            border-radius: 8px; cursor: pointer; transition: background .15s, border-color .15s;
+        }
+        .checklist-item:hover { background: var(--blue-50); border-color: var(--blue-200); }
+        .checklist-item input[type="checkbox"] {
+            width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px;
+            accent-color: var(--blue-700); cursor: pointer;
+        }
+        .checklist-item span { font-size: .875rem; line-height: 1.45; user-select: none; }
+
+        .checklist-item.is-checked {
+            background: #edfaf3; border-color: #6ee7b7;
+        }
+
+        .alert-box {
+            display: none; margin: 2px 0 8px 32px;
+            padding: 10px 14px; border-radius: 0 0 8px 8px;
+            font-size: .82rem; line-height: 1.5; border-left-width: 4px; border-left-style: solid;
+        }
+        .alert-box.warn  { background: #fffbeb; border-color: #f59e0b; color: #78350f; }
+        .alert-box.error { background: #fef2f2; border-color: #ef4444; color: #7f1d1d; }
+
+        /* ── PARECER ─────────────────────────────── */
+        .radio-group { display: flex; flex-direction: column; gap: 8px; }
+        .radio-label {
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+            border: 1.5px solid var(--gray-200); border-radius: 8px; cursor: pointer;
+            font-size: .875rem; transition: background .15s, border-color .15s;
+        }
+        .radio-label:hover { background: var(--blue-50); border-color: var(--blue-200); }
+        .radio-label input[type="radio"] { accent-color: var(--blue-700); }
+        .radio-label.selected-regular   { background: #edfaf3; border-color: #34d399; }
+        .radio-label.selected-ressalvas { background: #fffbeb; border-color: #fbbf24; }
+        .radio-label.selected-irregular { background: #fef2f2; border-color: #f87171; }
+
+        .signature-box { text-align: center; margin-top: 32px; padding-top: 16px; }
+        .signature-line { border-top: 1.5px solid var(--gray-700); width: 75%; max-width: 360px; margin: 0 auto 10px; }
+        .signature-box .name { font-weight: 600; font-size: .875rem; }
+        .signature-box .org  { font-size: .78rem; color: var(--gray-500); margin-top: 2px; }
+
+        /* ── PDF HEADER ─────────────────────────── */
+        #pdf-header {
+            background: var(--blue-900); border-radius: var(--radius);
+            padding: 22px 32px; display: flex; align-items: center;
+            justify-content: space-between; margin-bottom: 22px;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+        #pdf-header img { height: 40px; filter: brightness(0) invert(1); }
+        #pdf-header .hdr-text { text-align: right; }
+        #pdf-header h1 { font-size: 1.25rem; color: white; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+        #pdf-header p  { font-size: .82rem; color: var(--blue-200); margin-top: 4px; }
+
+        /* ── TABLE (LIST TAB) ──────────────────── */
+        .table-wrapper { background: white; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+        .table-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1.5px solid var(--gray-100); }
+        .table-toolbar h2 { font-size: 1.1rem; color: var(--blue-900); font-weight: 700; }
+        .table-toolbar p  { font-size: .8rem; color: var(--gray-500); margin-top: 3px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 13px 18px; text-align: left; font-size: .875rem; border-bottom: 1px solid var(--gray-100); }
+        th { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); background: var(--gray-50); }
+        tr:hover td { background: var(--blue-50); }
+        td:last-child { text-align: right; }
+
+        .badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 10px; border-radius: 99px; font-size: .75rem; font-weight: 700;
+        }
+        .badge.regular   { background: #d1fae5; color: #065f46; }
+        .badge.ressalvas { background: #fef3c7; color: #78350f; }
+        .badge.irregular { background: #fee2e2; color: #7f1d1d; }
+        .badge.pendente  { background: var(--gray-100); color: var(--gray-500); }
+
+        .btn-sm {
+            padding: 6px 10px; font-family: inherit; font-size: .78rem; font-weight: 600;
+            border: none; border-radius: 6px; cursor: pointer; transition: filter .2s;
+        }
+        .btn-sm:hover { filter: brightness(1.1); }
+        .btn-sm.open { background: var(--blue-100); color: var(--blue-800); }
+        .btn-sm.del  { background: #fee2e2; color: #991b1b; }
+
+        /* ── EMPTY STATE ─────────────────────────── */
+        .empty-state { padding: 60px 20px; text-align: center; color: var(--gray-500); }
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+        .empty-state p { font-size: .9rem; }
+
+        /* ── TOAST ───────────────────────────────── */
+        #toast {
+            position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+            background: var(--gray-900); color: white; padding: 12px 20px;
+            border-radius: 8px; font-size: .875rem; font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0,0,0,.25);
+            transform: translateY(80px); opacity: 0;
+            transition: transform .3s ease, opacity .3s ease;
+            pointer-events: none;
+        }
+        #toast.show { transform: translateY(0); opacity: 1; }
+        #toast.success { border-left: 4px solid #34d399; }
+        #toast.error   { border-left: 4px solid #f87171; }
+
+        /* ── PDF MODE ────────────────────────────── */
+        body.pdf-mode { background: white; }
+        body.pdf-mode .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; break-inside: avoid; }
+        body.pdf-mode .check-group { page-break-inside: avoid; break-inside: avoid; }
+        body.pdf-mode .btn-auto { display: none; }
+        body.pdf-mode .alert-box { border: 1px solid currentColor; border-left-width: 4px; }
+        body.pdf-mode .checklist-item { background: white; }
+        body.pdf-mode .checklist-item.is-checked { background: #f0fdf4; }
+        body.pdf-mode #pdf-header { background-color: var(--blue-900) !important; }
+
+        /* ── EDIT MODE BANNER ───────────────────── */
+        #edit-banner {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: #fffbeb;
+            border: 1.5px solid #f59e0b;
+            border-radius: var(--radius);
+            padding: 12px 18px;
+            margin-bottom: 18px;
+            animation: slideDown .25s ease;
+        }
+        #edit-banner.visible { display: flex; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        #edit-banner .banner-left { display: flex; align-items: center; gap: 10px; }
+        #edit-banner .banner-icon { font-size: 1.3rem; }
+        #edit-banner .banner-text strong { display: block; font-size: .9rem; color: #78350f; }
+        #edit-banner .banner-text span   { font-size: .78rem; color: #92400e; }
+        #edit-banner .btn-cancel-edit {
+            font-family: inherit; font-size: .8rem; font-weight: 700;
+            padding: 7px 14px; border: 1.5px solid #f59e0b; border-radius: 7px;
+            background: white; color: #78350f; cursor: pointer; white-space: nowrap;
+            transition: background .2s;
+        }
+        #edit-banner .btn-cancel-edit:hover { background: #fef3c7; }
+
+        /* Row highlight in table when editing */
+        tr.editing-row td { background: #fffbeb !important; }
+        tr.editing-row td:first-child { border-left: 3px solid #f59e0b; }
+
+        /* ── MODAL DE JUSTIFICATIVAS ─────────────────── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.5); z-index: 1000;
+            align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: white; border-radius: 12px; width: 100%; max-width: 720px;
+            max-height: 88vh; display: flex; flex-direction: column;
+            box-shadow: 0 24px 60px rgba(0,0,0,.25);
+            animation: modalIn .2s ease;
+        }
+        @keyframes modalIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+        .modal-header {
+            padding: 20px 24px 16px; border-bottom: 1.5px solid var(--gray-100);
+            display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+        }
+        .modal-header h3 { font-size: 1rem; font-weight: 700; color: var(--blue-900); margin-bottom: 4px; }
+        .modal-header p  { font-size: .8rem; color: var(--gray-500); }
+        .modal-close {
+            background: none; border: none; font-size: 1.3rem; cursor: pointer;
+            color: var(--gray-500); line-height: 1; padding: 2px; flex-shrink: 0;
+            transition: color .2s;
+        }
+        .modal-close:hover { color: var(--gray-900); }
+        .modal-body { padding: 16px 24px; overflow-y: auto; flex: 1; }
+        .modal-footer {
+            padding: 14px 24px; border-top: 1.5px solid var(--gray-100);
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        }
+        .modal-footer .footer-left { font-size: .8rem; color: var(--gray-500); }
+
+        /* Item de justificativa no modal */
+        .jus-item {
+            border: 1.5px solid var(--gray-200); border-radius: 8px;
+            margin-bottom: 10px; overflow: hidden; transition: border-color .15s;
+        }
+        .jus-item.selected { border-color: var(--blue-500); background: var(--blue-50); }
+        .jus-item-header {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 12px 14px; cursor: pointer;
+        }
+        .jus-item-header input[type="checkbox"] {
+            width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px;
+            accent-color: var(--blue-700); cursor: pointer;
+        }
+        .jus-item-title { font-size: .875rem; font-weight: 600; color: var(--gray-900); line-height: 1.4; }
+        .jus-item-fase  { font-size: .75rem; color: var(--gray-500); margin-top: 2px; }
+        .jus-item-legal {
+            margin: 0 14px 12px 43px; padding: 10px 14px;
+            background: #fffbeb; border-left: 4px solid #f59e0b;
+            border-radius: 0 6px 6px 0; font-size: .82rem; line-height: 1.6; color: #78350f;
+        }
+        .jus-item-legal.error-legal {
+            background: #fef2f2; border-color: #ef4444; color: #7f1d1d;
+        }
+        .jus-custom-label {
+            display: block; font-size: .75rem; font-weight: 600; color: var(--gray-700);
+            margin: 0 14px 4px 43px;
+        }
+        .jus-custom-input {
+            display: block; width: calc(100% - 57px); margin: 0 14px 12px 43px;
+            padding: 8px 10px; border: 1.5px solid var(--gray-300); border-radius: 6px;
+            font-family: inherit; font-size: .85rem; color: var(--gray-900);
+            background: white; resize: vertical; min-height: 60px;
+            transition: border-color .2s;
+        }
+        .jus-custom-input:focus { outline: none; border-color: var(--blue-500); }
+
+        .modal-empty {
+            text-align: center; padding: 40px 20px; color: var(--gray-500);
+        }
+        .modal-empty .icon { font-size: 2rem; margin-bottom: 10px; }
+        .modal-empty p { font-size: .9rem; }
+
+        /* ── TELA DE LOGIN ───────────────────────── */
+        #login-screen {
+            display: none; position: fixed; inset: 0;
+            background: var(--blue-900);
+            align-items: center; justify-content: center;
+            z-index: 9999; padding: 20px;
+        }
+        #login-screen.visible { display: flex; }
+        .login-box {
+            background: white; border-radius: 16px;
+            padding: 40px; width: 100%; max-width: 420px;
+            box-shadow: 0 32px 80px rgba(0,0,0,.4);
+        }
+        .login-logo { text-align: center; margin-bottom: 28px; }
+        .login-logo img { height: 40px; }
+        .login-title {
+            text-align: center; margin-bottom: 28px;
+        }
+        .login-title h2 { font-size: 1.3rem; font-weight: 700; color: var(--blue-900); }
+        .login-title p  { font-size: .85rem; color: var(--gray-500); margin-top: 4px; }
+        .login-tabs {
+            display: flex; border-radius: 8px; background: var(--gray-100);
+            padding: 4px; margin-bottom: 24px; gap: 4px;
+        }
+        .login-tab {
+            flex: 1; padding: 8px; font-family: inherit; font-size: .875rem;
+            font-weight: 600; border: none; border-radius: 6px; cursor: pointer;
+            background: transparent; color: var(--gray-500); transition: all .2s;
+        }
+        .login-tab.active { background: white; color: var(--blue-800); box-shadow: var(--shadow-sm); }
+        .login-field { margin-bottom: 14px; }
+        .login-field label { display: block; font-size: .8rem; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; }
+        .login-field input {
+            width: 100%; padding: 11px 14px; border: 1.5px solid var(--gray-300);
+            border-radius: 8px; font-family: inherit; font-size: .95rem;
+            color: var(--gray-900); background: var(--gray-50);
+            transition: border-color .2s, background .2s;
+        }
+        .login-field input:focus { outline: none; border-color: var(--blue-500); background: white; box-shadow: 0 0 0 3px rgba(0,115,204,.1); }
+        .btn-login {
+            width: 100%; padding: 12px; font-family: inherit; font-size: 1rem;
+            font-weight: 700; border: none; border-radius: 8px; cursor: pointer;
+            background: var(--blue-800); color: white;
+            transition: background .2s, transform .15s; margin-top: 6px;
+        }
+        .btn-login:hover { background: var(--blue-700); transform: translateY(-1px); }
+        .btn-login:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+        .login-error {
+            display: none; background: #fee2e2; border: 1px solid #fecaca;
+            color: #991b1b; font-size: .82rem; padding: 10px 14px;
+            border-radius: 7px; margin-bottom: 14px; text-align: center;
+        }
+        .login-error.visible { display: block; }
+        .login-success {
+            display: none; background: #dcfce7; border: 1px solid #bbf7d0;
+            color: #166534; font-size: .82rem; padding: 10px 14px;
+            border-radius: 7px; margin-bottom: 14px; text-align: center;
+        }
+        .login-success.visible { display: block; }
+
+        /* ── USER CHIP NA TOPBAR ─────────────────── */
+        .user-chip {
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(255,255,255,.1); border-radius: 99px;
+            padding: 6px 14px 6px 10px; cursor: default;
+        }
+        .user-chip .avatar {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: var(--blue-500); color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .8rem; font-weight: 700; flex-shrink: 0;
+        }
+        .user-chip .email { font-size: .78rem; color: var(--blue-200); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .btn-logout {
+            background: rgba(255,255,255,.12); border: none; color: var(--blue-200);
+            font-family: inherit; font-size: .78rem; font-weight: 600;
+            padding: 6px 12px; border-radius: 6px; cursor: pointer;
+            transition: background .2s; white-space: nowrap;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,.22); color: white; }
+
+        /* ── CONTROLE DE PRAZOS ──────────────────── */
+        .prazos-layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; align-items: start; }
+        .prazo-form-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
+
+        .prazo-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
+        .prazo-stat {
+            background: white; border-radius: var(--radius); padding: 16px 18px;
+            box-shadow: var(--shadow-sm); text-align: center;
+        }
+        .prazo-stat .ps-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); }
+        .prazo-stat .ps-value { font-size: 1.8rem; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin-top: 6px; }
+        .prazo-stat.ps-vencido  { border-top: 3px solid #ef4444; }
+        .prazo-stat.ps-vencido  .ps-value { color: #dc2626; }
+        .prazo-stat.ps-urgente  { border-top: 3px solid #f59e0b; }
+        .prazo-stat.ps-urgente  .ps-value { color: #d97706; }
+        .prazo-stat.ps-ok       { border-top: 3px solid #22c55e; }
+        .prazo-stat.ps-ok       .ps-value { color: #16a34a; }
+        .prazo-stat.ps-concluido{ border-top: 3px solid var(--gray-300); }
+        .prazo-stat.ps-concluido .ps-value { color: var(--gray-500); }
+
+        .prazo-filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+        .filter-btn {
+            padding: 6px 14px; font-family: inherit; font-size: .78rem; font-weight: 700;
+            border: 1.5px solid var(--gray-300); border-radius: 99px; cursor: pointer;
+            background: white; color: var(--gray-500); transition: all .2s;
+        }
+        .filter-btn:hover { border-color: var(--blue-300); color: var(--blue-700); }
+        .filter-btn.active { background: var(--blue-800); color: white; border-color: var(--blue-800); }
+
+        /* Card de prazo */
+        .prazo-card {
+            background: white; border-radius: var(--radius); padding: 16px 18px;
+            box-shadow: var(--shadow-sm); margin-bottom: 10px;
+            border-left: 4px solid var(--gray-300);
+            transition: box-shadow .2s;
+        }
+        .prazo-card:hover { box-shadow: var(--shadow); }
+        .prazo-card.vencido  { border-color: #ef4444; }
+        .prazo-card.urgente  { border-color: #f59e0b; }
+        .prazo-card.ok       { border-color: #22c55e; }
+        .prazo-card.concluido{ border-color: var(--gray-300); opacity: .7; }
+        .prazo-card.saiu     { border-color: var(--blue-500); opacity: .7; }
+
+        .prazo-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+        .prazo-card-title { font-size: .95rem; font-weight: 700; color: var(--gray-900); }
+        .prazo-card-desc  { font-size: .82rem; color: var(--gray-500); margin-top: 3px; }
+        .prazo-card-bottom { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+
+        .dias-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 12px; border-radius: 99px; font-size: .8rem; font-weight: 700;
+        }
+        .dias-badge.vencido  { background: #fee2e2; color: #991b1b; }
+        .dias-badge.urgente  { background: #fef3c7; color: #78350f; }
+        .dias-badge.ok       { background: #dcfce7; color: #166534; }
+        .dias-badge.concluido{ background: var(--gray-100); color: var(--gray-500); }
+        .dias-badge.saiu     { background: var(--blue-100); color: var(--blue-800); }
+
+        .prazo-meta { font-size: .78rem; color: var(--gray-500); }
+        .prazo-actions { display: flex; gap: 6px; margin-left: auto; }
+
+        .btn-prazo {
+            padding: 5px 10px; font-family: inherit; font-size: .75rem; font-weight: 700;
+            border: none; border-radius: 6px; cursor: pointer; transition: filter .2s;
+        }
+        .btn-prazo:hover { filter: brightness(.9); }
+        .btn-prazo.concluir { background: #dcfce7; color: #166534; }
+        .btn-prazo.saiu-btn { background: var(--blue-100); color: var(--blue-800); }
+        .btn-prazo.reabrir  { background: var(--gray-100); color: var(--gray-700); }
+        .btn-prazo.editar   { background: #fef3c7; color: #78350f; }
+        .btn-prazo.excluir  { background: #fee2e2; color: #991b1b; }
+
+        .prazos-empty { text-align: center; padding: 50px 20px; color: var(--gray-500); }
+        .prazos-empty .icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+        /* barra de progresso no card */
+        .prazo-progress { flex: 1; min-width: 120px; }
+        .prazo-progress-bar { height: 6px; background: var(--gray-100); border-radius: 99px; overflow: hidden; }
+        .prazo-progress-fill { height: 100%; border-radius: 99px; transition: width .4s; }
+
+
+        /* ── CONSULTA CNPJ ───────────────────────── */
+        .cnpj-link-btn {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px; background: var(--gray-50);
+            border: 1.5px solid var(--gray-200); border-radius: 8px;
+            cursor: pointer; font-family: inherit; font-size: .875rem;
+            color: var(--gray-700); text-align: left;
+            transition: background .15s, border-color .15s;
+            width: 100%;
+        }
+        .cnpj-link-btn:hover { background: var(--blue-50); border-color: var(--blue-200); color: var(--blue-900); }
+        .cnpj-wrap input {
+            width: 100%; padding: 13px 110px 13px 16px;
+            border: 2px solid var(--gray-300); border-radius: 8px;
+            font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem;
+            letter-spacing: .08em; color: var(--gray-900); background: var(--gray-50);
+            transition: border-color .2s;
+        }
+        .cnpj-wrap input:focus { outline: none; border-color: var(--blue-500); background: white; box-shadow: 0 0 0 3px rgba(0,115,204,.1); }
+        .cnpj-btn {
+            position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+            background: var(--blue-800); color: white; border: none; border-radius: 6px;
+            padding: 8px 16px; font-family: inherit; font-size: .875rem; font-weight: 700;
+            cursor: pointer; transition: background .2s; white-space: nowrap;
+        }
+        .cnpj-btn:hover { background: var(--blue-700); }
+        .cnpj-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        .emp-card {
+            display: none; margin-top: 20px;
+            border: 1.5px solid var(--blue-200); border-radius: 10px; overflow: hidden;
+        }
+        .emp-card.visible { display: block; }
+        .emp-header {
+            background: var(--blue-900); padding: 16px 20px;
+            display: flex; align-items: center; gap: 14px;
+        }
+        .emp-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--blue-500); color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: 700; flex-shrink: 0;
+        }
+        .emp-header-nome { color: white; font-size: 1rem; font-weight: 700; }
+        .emp-header-cnpj { color: var(--blue-200); font-size: .82rem; font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+        .emp-body { padding: 20px; background: white; }
+        .emp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .emp-field label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); display: block; margin-bottom: 3px; }
+        .emp-field span  { font-size: .9rem; color: var(--gray-900); }
+        .emp-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 12px; border-radius: 99px; font-size: .8rem; font-weight: 700;
+        }
+        .emp-badge.ativa    { background: #dcfce7; color: #166534; }
+        .emp-badge.inativa  { background: #fee2e2; color: #991b1b; }
+        .emp-badge.suspensa { background: #fef3c7; color: #78350f; }
+        .emp-socios { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-100); }
+        .emp-socios h4 { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); margin-bottom: 10px; }
+        .socio-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
+        .socio-item:last-child { border-bottom: none; }
+        .socio-icon { width: 32px; height: 32px; border-radius: 50%; background: var(--blue-50); color: var(--blue-700); display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 700; flex-shrink: 0; }
+        .socio-nome { font-size: .875rem; font-weight: 600; color: var(--gray-900); }
+        .socio-qual { font-size: .75rem; color: var(--gray-500); margin-top: 1px; }
+        .emp-cnaes { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-100); }
+        .emp-cnaes h4 { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); margin-bottom: 10px; }
+        .cnae-item { font-size: .82rem; color: var(--gray-700); padding: 5px 0; border-bottom: 1px solid var(--gray-100); }
+        .cnae-item:last-child { border-bottom: none; }
+        .cnae-item strong { color: var(--blue-800); font-family: 'IBM Plex Mono', monospace; font-size: .78rem; }
+
+        /* ── RESPONSIVE — TABLET ────────────────── */
+        @media (max-width: 900px) {
+            .main-grid         { grid-template-columns: 1fr; }
+            .stats-row         { grid-template-columns: 1fr 1fr; }
+            .stat-card.wide    { grid-column: span 2; }
+            .topbar            { padding: 0 16px; }
+            .page              { padding: 16px; }
+            .prazos-layout     { grid-template-columns: 1fr; }
+            .emp-grid          { grid-template-columns: 1fr 1fr; }
+        }
+
+        /* ── RESPONSIVE — MOBILE ─────────────────── */
+        @media (max-width: 600px) {
+            /* Topbar */
+            .topbar {
+                flex-wrap: wrap;
+                height: auto;
+                padding: 10px 12px;
+                gap: 8px;
+            }
+            .topbar-logo img { height: 28px; }
+            .topbar-tabs {
+                order: 3;
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                gap: 4px;
+                padding-bottom: 2px;
+            }
+            .topbar-tabs::-webkit-scrollbar { display: none; }
+            .tab-btn {
+                padding: 7px 12px;
+                font-size: .78rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+            .user-chip .email { display: none; }
+            .btn-logout { padding: 5px 10px; font-size: .75rem; }
+
+            /* Pages */
+            .page { padding: 12px; }
+
+            /* Action bar */
+            .action-bar {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .action-bar .btn { padding: 8px 14px; font-size: .8rem; }
+
+            /* Stats */
+            .stats-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin-bottom: 14px;
+            }
+            .stat-card { padding: 12px 14px; }
+            .stat-card .value { font-size: 1.5rem; }
+            .stat-card.wide { grid-column: span 2; }
+
+            /* Main grid */
+            .main-grid { grid-template-columns: 1fr; gap: 12px; }
+
+            /* Cards */
+            .card { padding: 16px; margin-bottom: 12px; }
+            .card-title { font-size: .9rem; }
+
+            /* Form fields */
+            .row-2 { grid-template-columns: 1fr; }
+
+            /* Checklist */
+            .checklist-item { padding: 10px 12px; }
+            .checklist-item span { font-size: .82rem; }
+
+            /* Radio labels */
+            .radio-label { padding: 8px 12px; font-size: .82rem; }
+
+            /* Signature */
+            .signature-box { margin-top: 20px; }
+
+            /* Table */
+            .table-toolbar { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .table-wrapper { overflow-x: auto; }
+            table { min-width: 600px; }
+            th, td { padding: 10px 12px; font-size: .8rem; }
+
+            /* Prazos */
+            .prazos-layout { grid-template-columns: 1fr; gap: 12px; }
+            .prazo-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .prazo-stat { padding: 12px; }
+            .prazo-stat .ps-value { font-size: 1.5rem; }
+            .prazo-filters { gap: 6px; }
+            .filter-btn { padding: 5px 10px; font-size: .72rem; }
+            .prazo-card { padding: 12px; }
+            .prazo-card-top { flex-wrap: wrap; gap: 8px; }
+            .dias-badge { font-size: .72rem; }
+
+            /* CNPJ */
+            .cnpj-wrap input { font-size: .9rem; padding: 10px 90px 10px 12px; }
+            .cnpj-btn { padding: 6px 10px; font-size: .78rem; }
+            .emp-grid { grid-template-columns: 1fr; gap: 8px; }
+            .emp-header { flex-wrap: wrap; gap: 10px; }
+            .emp-header-nome { font-size: .9rem; }
+            .cnpj-link-btn { padding: 10px 12px; font-size: .82rem; }
+
+            /* Login */
+            .login-box { padding: 24px 20px; }
+            .login-title h2 { font-size: 1.1rem; }
+
+            /* Edit banner */
+            #edit-banner { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+            /* Modal */
+            .modal { max-height: 95vh; }
+            .modal-header { padding: 14px 16px; }
+            .modal-body { padding: 12px 16px; }
+            .modal-footer { padding: 12px 16px; flex-direction: column; gap: 8px; }
+            .modal-footer div:last-child { width: 100%; display: flex; gap: 8px; }
+            .modal-footer .btn { flex: 1; justify-content: center; }
+
+            /* PDF header */
+            #pdf-header { padding: 14px 16px; }
+            #pdf-header img { height: 28px; }
+            #pdf-header h1 { font-size: 1rem; }
+
+            /* Certidoes grid */
+            #cert-estaduais-lista,
+            .card [style*="grid-template-columns: 1fr 1fr"] {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* Buttons */
+            .btn { padding: 9px 16px; font-size: .82rem; }
+            .btn-sm { padding: 5px 8px; font-size: .72rem; }
+        }
+
+        /* ── RESPONSIVE — SMALL MOBILE ───────────── */
+        @media (max-width: 380px) {
+            .topbar-logo img { height: 22px; }
+            .tab-btn { padding: 6px 10px; font-size: .72rem; }
+            .stats-row { grid-template-columns: 1fr; }
+            .stat-card.wide { grid-column: span 1; }
+            .prazo-stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══ TELA DE LOGIN ════════════════════════════════════════════════════ -->
+<div id="login-screen" class="visible">
+    <div class="login-box">
+        <div class="login-logo">
+            <img src="https://saaetri.com.br/wp-content/uploads/2022/06/NOVA-LOGO-SAAETRI-ALTA-RESOLUCAO-1024x264.png" alt="SAAETRI">
+        </div>
+        <div class="login-title">
+            <h2>Controle Interno</h2>
+            <p>Acesse com sua conta para continuar</p>
+        </div>
+
+        <div class="login-tabs">
+            <button class="login-tab active" id="tab-entrar" onclick="switchLoginTab('entrar')">Entrar</button>
+            <button class="login-tab" id="tab-cadastro" onclick="switchLoginTab('cadastro')">Criar Conta</button>
+        </div>
+
+        <div id="login-error"   class="login-error"></div>
+        <div id="login-success" class="login-success"></div>
+
+        <div id="form-entrar">
+            <form onsubmit="fazerLogin(); return false;">
+            <div class="login-field">
+                <label>E-mail</label>
+                <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+            </div>
+            <div class="login-field">
+                <label>Senha</label>
+                <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-login" id="btn-login">Entrar</button>
+            </form>
+        </div>
+
+        <div id="form-cadastro" style="display:none;">
+            <form onsubmit="fazerCadastro(); return false;">
+            <div class="login-field">
+                <label>Nome completo</label>
+                <input type="text" id="cadastro-nome" placeholder="Seu nome" autocomplete="name">
+            </div>
+            <div class="login-field">
+                <label>E-mail</label>
+                <input type="email" id="cadastro-email" placeholder="seu@email.com" autocomplete="email">
+            </div>
+            <div class="login-field">
+                <label>Senha</label>
+                <input type="password" id="cadastro-senha" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn-login" id="btn-cadastro">Criar Conta</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- TOP BAR -->
+<header class="topbar">
+    <div class="topbar-logo">
+        <img src="https://saaetri.com.br/wp-content/uploads/2022/06/NOVA-LOGO-SAAETRI-ALTA-RESOLUCAO-1024x264.png" alt="SAAETRI">
+    </div>
+    <div class="topbar-tabs">
+        <button class="tab-btn active" id="btn-tab-form" onclick="openTab('form')">📝 Formulário</button>
+        <button class="tab-btn" id="btn-tab-list" onclick="openTab('list')">📁 Processos Salvos</button>
+        <button class="tab-btn" id="btn-tab-prazos" onclick="openTab('prazos')">⏱️ Controle de Prazos</button>
+        <button class="tab-btn" id="btn-tab-cnpj" onclick="openTab('cnpj')">🏢 Consulta CNPJ</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+        <div class="user-chip">
+            <div class="avatar" id="user-avatar">?</div>
+            <div class="email" id="user-email">—</div>
+        </div>
+        <button class="btn-logout" onclick="fazerLogout()">Sair</button>
+    </div>
+</header>
+
+<div id="toast"></div>
+
+<!-- ══ PAGE: FORM ══════════════════════════════════════════════════════ -->
+<div id="page-form" class="page active">
+
+    <div class="action-bar">
+        <div id="loader"><div class="spinner"></div> Gerando PDF…</div>
+        <input type="hidden" id="processo-id">
+        <button class="btn btn-ghost"   onclick="clearFormWithConfirm()">🧹 Limpar</button>
+        <button class="btn btn-success" onclick="saveProcess()">💾 Salvar</button>
+        <button class="btn btn-primary" id="btn-pdf" onclick="abrirPDF()">📄 Baixar PDF</button>
+    </div>
+
+    <!-- EDIT MODE BANNER -->
+    <div id="edit-banner">
+        <div class="banner-left">
+            <div class="banner-icon">✏️</div>
+            <div class="banner-text">
+                <strong id="edit-banner-title">Editando processo</strong>
+                <span>Faça as alterações e clique em 💾 Salvar para confirmar.</span>
+            </div>
+        </div>
+        <button class="btn-cancel-edit" onclick="cancelEdit()">✕ Cancelar edição</button>
+    </div>
+
+    <div id="pdf-content">
+
+        <div id="pdf-header">
+            <img src="https://saaetri.com.br/wp-content/uploads/2022/06/NOVA-LOGO-SAAETRI-ALTA-RESOLUCAO-1024x264.png" alt="SAAETRI">
+            <div class="hdr-text">
+                <h1>Controle Interno</h1>
+                <p>Auditoria de Processo Licitatório · Lei 14.133/2021</p>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card"><div class="label">Total de Requisitos</div><div class="value" id="stat-total">0</div></div>
+            <div class="stat-card"><div class="label">Itens Validados</div><div class="value" id="stat-checked">0</div></div>
+            <div class="stat-card wide">
+                <div class="label">Progresso da Análise</div>
+                <div class="value" id="stat-pct">0%</div>
+                <div class="progress-wrap"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+
+            <!-- LEFT -->
+            <div id="col-left">
+
+                <div class="card">
+                    <div class="card-title"><span>📋 Dados do Processo</span></div>
+
+                    <div class="field">
+                        <label>Nº do Processo Administrativo</label>
+                        <input type="text" id="in-processo" placeholder="Ex: 123/2025">
+                    </div>
+                    <div class="field">
+                        <label>Setor Requisitante</label>
+                        <input type="text" id="in-setor" placeholder="Ex: Dep. de Engenharia">
+                    </div>
+                    <div class="field">
+                        <label>Objeto da Licitação</label>
+                        <textarea id="in-objeto" placeholder="Descreva brevemente o objeto…"></textarea>
+                    </div>
+                    <div class="row-2">
+                        <div class="field">
+                            <label>Modalidade / Contratação</label>
+                            <select id="in-modalidade">
+                                <option value="">Selecione…</option>
+                                <option>Pregão Eletrônico</option>
+                                <option>Pregão Presencial</option>
+                                <option>Concorrência Eletrônica</option>
+                                <option>Dispensa Eletrônica (Com Disputa)</option>
+                                <option>Dispensa (Sem Disputa)</option>
+                                <option>Inexigibilidade</option>
+                                <option>Adesão a ARP (Carona)</option>
+                                <option>Leilão</option>
+                                <option>Concurso</option>
+                                <option>Diálogo Competitivo</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Critério de Julgamento</label>
+                            <select id="in-criterio">
+                                <option value="">Selecione…</option>
+                                <option>Menor Preço</option>
+                                <option>Maior Desconto</option>
+                                <option>Técnica e Preço</option>
+                                <option>Melhor Técnica / Cont. Artístico</option>
+                                <option>Maior Lance</option>
+                                <option>Maior Retorno Econômico</option>
+                                <option>N/A (Contratação Direta)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Data da Análise</label>
+                        <input type="date" id="in-data">
+                    </div>
+                </div>
+
+                <div class="card" id="bloco-parecer">
+                    <div class="card-title"><span>⚖️ Parecer do Controle Interno</span></div>
+
+                    <div class="field">
+                        <label style="margin-bottom:10px;display:block;">Conclusão da Análise</label>
+                        <div class="radio-group" id="radio-conclusao">
+                            <label class="radio-label" data-val="regular">
+                                <input type="radio" name="conclusao" value="regular"> ✅ Processo <strong>REGULAR</strong> (Apto)
+                            </label>
+                            <label class="radio-label" data-val="ressalvas">
+                                <input type="radio" name="conclusao" value="ressalvas"> ⚠️ Processo com <strong>RESSALVAS</strong>
+                            </label>
+                            <label class="radio-label" data-val="irregular">
+                                <input type="radio" name="conclusao" value="irregular"> ❌ Processo <strong>IRREGULAR</strong> (Saneamento)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-top:14px;">
+                        <label>Observações / Recomendações Gerais</label>
+                        <textarea id="in-observacoes" placeholder="Justifique a decisão final…" style="height:110px;"></textarea>
+                    </div>
+
+                    <div class="signature-box">
+                        <div class="signature-line"></div>
+                        <div class="name">Assinatura do Controlador Interno</div>
+                        <div class="org">SAAETRI — Serviço Autônomo de Água e Esgoto</div>
+                    </div>
+                </div>
+
+            </div><!-- /col-left -->
+
+            <!-- RIGHT -->
+            <div id="col-right">
+
+                <!-- FASE 1 -->
+                <div class="card">
+                    <div class="card-title">
+                        <span>1. Fase Preparatória</span>
+                        <button type="button" class="btn-auto" onclick="evalPhase1()" title="Exibe embasamento legal para itens não marcados">🪄 Avaliar</button>
+                    </div>
+
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-1"><span><strong>DFD:</strong> Necessidade justificada e alinhada ao Plano de Contratações Anual?</span></label>
+                        <div class="alert-box warn" id="al-c1-1"><strong>⚠️ Avaliação Legal:</strong> A ausência pode ser justificada apenas em contratações diretas por pequeno valor ou emergência (Art. 72, I c/c Art. 75, Lei 14.133/21).</div>
+                    </div>
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-2"><span><strong>ETP:</strong> Elaborado contemplando soluções, justificativa e impactos?</span></label>
+                        <div class="alert-box warn" id="al-c1-2"><strong>⚠️ Avaliação Legal:</strong> Facultativo em contratações de baixo valor ou dispensável nos casos previstos em regulamento local (Art. 18, § 1º, Lei 14.133/21).</div>
+                    </div>
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-3"><span><strong>Matriz de Riscos:</strong> Elaborada e anexada (quando aplicável)?</span></label>
+                        <div class="alert-box warn" id="al-c1-3"><strong>⚠️ Avaliação Legal:</strong> Obrigatório apenas para contratações de grande vulto ou regimes de contratação integrada/semi-integrada (Art. 22, Lei 14.133/21).</div>
+                    </div>
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-4"><span><strong>Termo de Referência:</strong> Especificação clara, modelo de execução e prazos?</span></label>
+                        <div class="alert-box error" id="al-c1-4"><strong>❌ Falha Grave:</strong> Documento essencial e obrigatório para a caracterização técnica do objeto (Art. 18, II, Lei 14.133/21). Regularização necessária.</div>
+                    </div>
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-5"><span><strong>Pesquisa de Preços:</strong> Metodologia válida e mapa de cotação nos autos?</span></label>
+                        <div class="alert-box error" id="al-c1-5"><strong>❌ Falha Grave:</strong> Obrigatória a comprovação da compatibilidade da estimativa de despesa com os preços de mercado (Art. 23, Lei 14.133/21).</div>
+                    </div>
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-6"><span><strong>Orçamento:</strong> Declaração de adequação com indicação da dotação?</span></label>
+                        <div class="alert-box error" id="al-c1-6"><strong>❌ Falha Grave:</strong> Indicação da dotação orçamentária é requisito essencial da fase preparatória (Art. 18, VIII, Lei 14.133/21).</div>
+                    </div>
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-7"><span><strong>Minutas:</strong> Edital e Contrato adequados ao modelo padronizado/objeto?</span></label>
+                        <div class="alert-box warn" id="al-c1-7"><strong>⚠️ Avaliação Legal:</strong> Dispensáveis quando o contrato for substituído por instrumento equivalente (ex: nota de empenho) em compras com entrega imediata (Art. 95, Lei 14.133/21).</div>
+                    </div>
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-8"><span><strong>Parecer Jurídico:</strong> Procuradoria aprovou a fase interna e as minutas?</span></label>
+                        <div class="alert-box warn" id="al-c1-8"><strong>⚠️ Avaliação Legal:</strong> Dispensável em contratações diretas de pequeno valor ou havendo parecer jurídico referencial (Art. 53, § 5º, Lei 14.133/21).</div>
+                    </div>
+                    <div class="check-group">
+                        <label class="checklist-item"><input type="checkbox" class="ck" id="c1-9"><span><strong>Autoridade Competente:</strong> Autorizou a abertura da licitação?</span></label>
+                        <div class="alert-box error" id="al-c1-9"><strong>❌ Falha Grave:</strong> Aprovação formal da autoridade competente é obrigatória para prosseguimento do feito (Art. 71, Lei 14.133/21).</div>
+                    </div>
+                </div>
+
+                <!-- FASE 2 -->
+                <div class="card">
+                    <div class="card-title"><span>2. Fase Externa</span></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Publicidade:</strong> Edital publicado no PNCP e Diário Oficial?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Prazos:</strong> Prazos mínimos até a sessão pública respeitados?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Impugnações:</strong> Esclarecimentos respondidos e juntados aos autos?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Sessão Pública:</strong> Regularidade e juntada da Ata da Sessão?</span></label></div>
+                </div>
+
+                <!-- FASE 3 -->
+                <div class="card">
+                    <div class="card-title"><span>3. Habilitação e Julgamento</span></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Propostas:</strong> Vencedora adequada às especificações e valor estimado?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Exequibilidade:</strong> Verificada a ausência de preços inexequíveis?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Habilitação:</strong> Regularidade jurídica, fiscal, trabalhista e técnica comprovadas?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Cadastros:</strong> Consulta ao SICAF, CEIS e TCU atestando não impedimento?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Recursos:</strong> Decisão manifestada pela autoridade em caso de recursos?</span></label></div>
+                </div>
+
+                <!-- FASE 4 -->
+                <div class="card">
+                    <div class="card-title"><span>4. Homologação e Contratação</span></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Homologação:</strong> Objeto adjudicado e processo homologado pela autoridade?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Assinatura:</strong> Contrato (ou nota de empenho) assinado e anexado?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>PNCP:</strong> Extrato do contrato publicado no prazo legal?</span></label></div>
+                    <div class="check-group"><label class="checklist-item"><input type="checkbox" class="ck"><span><strong>Fiscalização:</strong> Portaria de nomeação dos fiscais e gestor publicada?</span></label></div>
+                </div>
+
+            </div><!-- /col-right -->
+        </div><!-- /main-grid -->
+    </div><!-- /pdf-content -->
+    <!-- MODAL DE SELEÇÃO DE JUSTIFICATIVAS -->
+    <div class="modal-overlay" id="modal-jus">
+        <div class="modal">
+            <div class="modal-header">
+                <div>
+                    <h3>📋 Selecionar Justificativas para o PDF</h3>
+                    <p>Escolha quais itens pendentes terão justificativa legal no relatório. Você também pode adicionar uma justificativa personalizada para cada item.</p>
+                </div>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modal-jus-body">
+                <!-- preenchido dinamicamente -->
+            </div>
+            <div class="modal-footer">
+                <div class="footer-left" id="modal-jus-count">0 itens selecionados</div>
+                <div style="display:flex;gap:10px;">
+                    <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="confirmarPDF()">📄 Gerar PDF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /page-form -->
+
+<!-- ══ PAGE: LIST ══════════════════════════════════════════════════════ -->
+<div id="page-list" class="page">
+    <div class="table-wrapper">
+        <div class="table-toolbar">
+            <div>
+                <h2>Processos Salvos</h2>
+                <p>Dados armazenados localmente no navegador</p>
+            </div>
+            <button class="btn btn-excel" onclick="exportCSV()">📊 Exportar Excel</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nº Processo</th>
+                    <th>Setor Requisitante</th>
+                    <th>Modalidade</th>
+                    <th>Data Análise</th>
+                    <th>Status</th>
+                    <th>Última Atualização</th>
+                    <th style="text-align:right;">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ══ PAGE: PRAZOS ════════════════════════════════════════════════════ -->
+<div id="page-prazos" class="page">
+
+    <!-- STATS -->
+    <div class="prazo-stats">
+        <div class="prazo-stat ps-vencido">
+            <div class="ps-label">⛔ Vencidos</div>
+            <div class="ps-value" id="ps-vencido">0</div>
+        </div>
+        <div class="prazo-stat ps-urgente">
+            <div class="ps-label">⚠️ Urgentes (≤5 dias)</div>
+            <div class="ps-value" id="ps-urgente">0</div>
+        </div>
+        <div class="prazo-stat ps-ok">
+            <div class="ps-label">✅ No Prazo</div>
+            <div class="ps-value" id="ps-ok">0</div>
+        </div>
+        <div class="prazo-stat ps-concluido">
+            <div class="ps-label">🏁 Concluídos / Saíram</div>
+            <div class="ps-value" id="ps-concluido">0</div>
+        </div>
+    </div>
+
+    <div class="prazos-layout">
+
+        <!-- FORMULÁRIO DE INSERÇÃO -->
+        <div class="prazo-form-card">
+            <div class="card-title"><span id="prazo-form-title">➕ Novo Prazo</span></div>
+            <input type="hidden" id="prazo-id">
+
+            <div class="field">
+                <label>Tipo de Processo</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;" id="prazo-tipo-group">
+                    <label style="flex:1;min-width:100px;">
+                        <input type="radio" name="prazo-tipo" value="pagamento" style="accent-color:var(--blue-700);">
+                        <span style="margin-left:5px;">💰 Pagamento</span>
+                    </label>
+                    <label style="flex:1;min-width:100px;">
+                        <input type="radio" name="prazo-tipo" value="licitacao" style="accent-color:var(--blue-700);">
+                        <span style="margin-left:5px;">📋 Licitação</span>
+                    </label>
+                    <label style="flex:1;min-width:100px;">
+                        <input type="radio" name="prazo-tipo" value="dispensa" style="accent-color:var(--blue-700);">
+                        <span style="margin-left:5px;">📄 Dispensa</span>
+                    </label>
+                    <label style="flex:1;min-width:100px;">
+                        <input type="radio" name="prazo-tipo" value="outros" checked style="accent-color:var(--blue-700);">
+                        <span style="margin-left:5px;">📁 Outros</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Nº do Processo</label>
+                <input type="text" id="prazo-processo" placeholder="Ex: 123/2025">
+            </div>
+            <div class="field">
+                <label>Descrição / Objeto</label>
+                <textarea id="prazo-descricao" placeholder="Descreva o processo ou prazo…" style="height:70px;"></textarea>
+            </div>
+            <div class="row-2">
+                <div class="field">
+                    <label>Data de Chegada</label>
+                    <input type="date" id="prazo-inicio">
+                </div>
+                <div class="field">
+                    <label>Prazo (dias)</label>
+                    <input type="number" id="prazo-dias" placeholder="Ex: 30" min="1">
+                </div>
+            </div>
+            <div class="field">
+                <label>Observação</label>
+                <input type="text" id="prazo-obs" placeholder="Anotação opcional…">
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:6px;">
+                <button class="btn btn-success" style="flex:1;" onclick="salvarPrazo()">💾 Salvar</button>
+                <button class="btn btn-ghost" onclick="limparPrazoForm()">✕</button>
+            </div>
+
+            <!-- Data limite calculada -->
+            <div id="prazo-preview" style="display:none;margin-top:14px;padding:12px;background:var(--blue-50);border-radius:8px;font-size:.85rem;color:var(--blue-800);text-align:center;">
+                📅 Data limite: <strong id="prazo-preview-data">—</strong>
+            </div>
+        </div>
+
+        <!-- LISTA DE PRAZOS -->
+        <div>
+            <div class="prazo-filters">
+                <button class="filter-btn active" data-filtro="todos"      onclick="filtrarPrazos('todos')">Todos</button>
+                <button class="filter-btn"        data-filtro="vencido"    onclick="filtrarPrazos('vencido')">⛔ Vencidos</button>
+                <button class="filter-btn"        data-filtro="urgente"    onclick="filtrarPrazos('urgente')">⚠️ Urgentes</button>
+                <button class="filter-btn"        data-filtro="ok"         onclick="filtrarPrazos('ok')">✅ No Prazo</button>
+                <button class="filter-btn"        data-filtro="concluido"  onclick="filtrarPrazos('concluido')">🏁 Concluídos</button>
+                <button class="filter-btn"        data-filtro="saiu"       onclick="filtrarPrazos('saiu')">📤 Saíram</button>
+                <div style="width:1px;background:var(--gray-200);margin:0 4px;"></div>
+                <button class="filter-btn"        data-filtro="t:pagamento" onclick="filtrarPrazos('t:pagamento')">💰 Pagamento</button>
+                <button class="filter-btn"        data-filtro="t:licitacao" onclick="filtrarPrazos('t:licitacao')">📋 Licitação</button>
+                <button class="filter-btn"        data-filtro="t:dispensa"  onclick="filtrarPrazos('t:dispensa')">📄 Dispensa</button>
+                <button class="filter-btn"        data-filtro="t:outros"    onclick="filtrarPrazos('t:outros')">📁 Outros</button>
+            </div>
+            <div id="prazos-lista">
+                <div class="prazos-empty"><div class="icon">⏱️</div><p>Nenhum prazo cadastrado ainda.</p></div>
+            </div>
+        </div><!-- /col-right prazos -->
+    </div><!-- /prazos-layout -->
+</div><!-- /page-prazos -->
+
+<!-- ══ PAGE: CONSULTA CNPJ ════════════════════════════════════════════ -->
+<div id="page-cnpj" class="page">
+    <div style="max-width:680px;margin:0 auto;">
+
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-title"><span>🏢 Consulta de CNPJ</span></div>
+            <div class="field" style="margin-bottom:10px;">
+                <label>CNPJ da Empresa</label>
+                <div style="display:flex;gap:10px;">
+                    <input type="text" id="cnpj-input" placeholder="00.000.000/0000-00"
+                           maxlength="18" oninput="mascaraCNPJ(this)"
+                           onkeydown="if(event.key==='Enter') buscarCNPJ()"
+                           style="font-family:'IBM Plex Mono',monospace;font-size:1.1rem;letter-spacing:.06em;flex:1;">
+                    <button class="btn btn-primary" onclick="buscarCNPJ()" id="cnpj-btn">🔍 Buscar</button>
+                    <button class="btn btn-ghost" onclick="limparCNPJ()">✕</button>
+                </div>
+            </div>
+            <div id="cnpj-status" style="display:none;margin-bottom:14px;padding:12px 16px;border-radius:8px;font-size:.875rem;"></div>
+            <div class="emp-card" id="emp-card">
+                <div class="emp-header">
+                    <div class="emp-avatar" id="emp-av">?</div>
+                    <div style="flex:1;">
+                        <div class="emp-header-nome" id="emp-nome"></div>
+                        <div class="emp-header-cnpj" id="emp-cnpj-txt"></div>
+                    </div>
+                    <div id="emp-status-badge"></div>
+                </div>
+                <div class="emp-body">
+                    <div class="emp-grid" id="emp-grid"></div>
+                    <div class="emp-socios" id="emp-socios"></div>
+                    <div class="emp-cnaes" id="emp-cnaes"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span>🔗 Certidões — Sites Oficiais</span></div>
+            <p style="font-size:.82rem;color:var(--gray-500);margin-bottom:14px;">O CNPJ digitado acima será usado nos links que suportam. Clique para abrir o site oficial.</p>
+
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-500);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--gray-100);">📋 Dados da Empresa</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                <button class="cnpj-link-btn" onclick="abrirConsulta('receita')"><span>🟦</span><div><div style="font-weight:600;font-size:.875rem;">Receita Federal</div><div style="font-size:.72rem;color:var(--gray-500);">Situação cadastral do CNPJ</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('simples')"><span>📊</span><div><div style="font-weight:600;font-size:.875rem;">Simples Nacional</div><div style="font-size:.72rem;color:var(--gray-500);">Opção pelo Simples/MEI</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+            </div>
+
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-500);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--gray-100);">💰 Regularidade Fiscal Federal</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                <button class="cnpj-link-btn" onclick="abrirConsulta('rfpgfn')"><span>📄</span><div><div style="font-weight:600;font-size:.875rem;">CND Federal</div><div style="font-size:.72rem;color:var(--gray-500);">Receita Federal + PGFN</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('fgts')"><span>🟧</span><div><div style="font-weight:600;font-size:.875rem;">CRF — FGTS</div><div style="font-size:.72rem;color:var(--gray-500);">Caixa Econômica Federal</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('inss')"><span>🟩</span><div><div style="font-weight:600;font-size:.875rem;">CND Previdenciária</div><div style="font-size:.72rem;color:var(--gray-500);">INSS / Previdência Social</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('tst')"><span>⚖️</span><div><div style="font-weight:600;font-size:.875rem;">CNDT Trabalhista</div><div style="font-size:.72rem;color:var(--gray-500);">Tribunal Superior do Trabalho</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+            </div>
+
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-500);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--gray-100);">🚫 Cadastros de Impedimento e Sanções</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                <button class="cnpj-link-btn" onclick="abrirConsulta('ceis')"><span>🚫</span><div><div style="font-weight:600;font-size:.875rem;">CEIS</div><div style="font-size:.72rem;color:var(--gray-500);">Empresas inidôneas e suspensas</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('cnep')"><span>🚫</span><div><div style="font-weight:600;font-size:.875rem;">CNEP</div><div style="font-size:.72rem;color:var(--gray-500);">Empresas punidas — Lei Anticorrupção</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('cadin')"><span>📋</span><div><div style="font-weight:600;font-size:.875rem;">CADIN</div><div style="font-size:.72rem;color:var(--gray-500);">Inadimplentes com o governo federal</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('tcu')"><span>🔎</span><div><div style="font-weight:600;font-size:.875rem;">TCU — Inidôneos</div><div style="font-size:.72rem;color:var(--gray-500);">Tribunal de Contas da União</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+            </div>
+
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-500);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--gray-100);">🏛️ Cadastros e Habilitação</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button class="cnpj-link-btn" onclick="abrirConsulta('sicaf')"><span>🏛️</span><div><div style="font-weight:600;font-size:.875rem;">SICAF</div><div style="font-size:.72rem;color:var(--gray-500);">Cadastramento unificado de fornecedores</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('pncp')"><span>📑</span><div><div style="font-weight:600;font-size:.875rem;">PNCP</div><div style="font-size:.72rem;color:var(--gray-500);">Portal Nacional de Contratações Públicas</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('jucerja')"><span>📁</span><div><div style="font-weight:600;font-size:.875rem;">Junta Comercial (RJ)</div><div style="font-size:.72rem;color:var(--gray-500);">Atos constitutivos — JUCERJA</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+                <button class="cnpj-link-btn" onclick="abrirConsulta('trt')"><span>⚖️</span><div><div style="font-weight:600;font-size:.875rem;">TRT — Débitos Trabalhistas</div><div style="font-size:.72rem;color:var(--gray-500);">Tribunal Regional do Trabalho</div></div><span style="margin-left:auto;color:var(--blue-500);">↗</span></button>
+            </div>
+
+            <!-- CERTIDÕES ESTADUAIS E MUNICIPAIS — dinâmicas -->
+            <div id="cert-estaduais" style="display:none;margin-top:16px;">
+                <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-500);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--gray-100);">🗺️ Certidões Estaduais e Municipais</div>
+                <div id="cert-estaduais-lista" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// ── UTILS ─────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `show ${type}`;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.className = '', 2800);
+}
+
+function $ (id) { return document.getElementById(id); }
+
+// ── TABS ──────────────────────────────────────────────────────────────
+function openTab(tab) {
+    ['form','list','prazos','cnpj'].forEach(t => {
+        const page = $(`page-${t}`);
+        const btn  = $(`btn-tab-${t}`);
+        if (page) {
+            page.classList.toggle('active', t === tab);
+            page.style.display = (t === tab) ? 'block' : 'none';
+        }
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
+    if (tab === 'list')   loadTable();
+    if (tab === 'prazos') carregarPrazos();
+}
+
+// ── PROGRESS ─────────────────────────────────────────────────────────
+function updateProgress() {
+    const all = document.querySelectorAll('.ck');
+    const done = document.querySelectorAll('.ck:checked').length;
+    const total = all.length;
+    const pct = total ? Math.round(done / total * 100) : 0;
+    $('stat-total').textContent  = total;
+    $('stat-checked').textContent = done;
+    $('stat-pct').textContent    = pct + '%';
+    $('progress-fill').style.width = pct + '%';
+}
+
+document.querySelectorAll('.ck').forEach(cb => {
+    cb.addEventListener('change', function () {
+        updateProgress();
+        const item = this.closest('.checklist-item');
+        if (item) item.classList.toggle('is-checked', this.checked);
+        if (this.checked && this.id) {
+            const al = $('al-' + this.id);
+            if (al) al.style.display = 'none';
+        }
+    });
+});
+
+// ── RADIO STYLE ───────────────────────────────────────────────────────
+document.querySelectorAll('.radio-label').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+        document.querySelectorAll('.radio-label').forEach(l => l.className = 'radio-label');
+        const val = lbl.dataset.val;
+        lbl.classList.add('selected-' + val);
+    });
+});
+
+// ── PHASE 1 EVAL ─────────────────────────────────────────────────────
+function evalPhase1() {
+    let hasIssue = false;
+    ['c1-1','c1-2','c1-3','c1-4','c1-5','c1-6','c1-7','c1-8','c1-9'].forEach(id => {
+        const cb = $(id), al = $('al-' + id);
+        if (!cb || !al) return;
+        if (!cb.checked) { al.style.display = 'block'; hasIssue = true; }
+        else al.style.display = 'none';
+    });
+    if (hasIssue) {
+        const r = document.querySelector('input[name="conclusao"][value="ressalvas"]');
+        if (r) { r.checked = true; document.querySelectorAll('.radio-label').forEach(l => l.className = 'radio-label'); r.closest('.radio-label').classList.add('selected-ressalvas'); }
+    }
+}
+
+// ── EDIT MODE ─────────────────────────────────────────────────────────
+let _editingId = null;
+
+function setEditMode(id, label) {
+    _editingId = id;
+    $('edit-banner-title').textContent = `Editando: ${label}`;
+    $('edit-banner').classList.add('visible');
+    // highlight save button
+    const btnSave = document.querySelector('.btn-success');
+    if (btnSave) { btnSave.textContent = '💾 Salvar Alterações'; }
+}
+
+function clearEditMode() {
+    _editingId = null;
+    $('edit-banner').classList.remove('visible');
+    const btnSave = document.querySelector('.btn-success');
+    if (btnSave) { btnSave.textContent = '💾 Salvar'; }
+}
+
+function cancelEdit() {
+    clearEditMode();
+    clearFormSilent();
+    toast('Edição cancelada.');
+}
+
+// ── SUPABASE ──────────────────────────────────────────────────────────
+const SUPA_URL = 'https://qygahojzopzotxaodmky.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5Z2Fob2p6b3B6b3R4YW9kbWt5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzM2MzUsImV4cCI6MjA4OTIwOTYzNX0.T1sGlXTag9wZzP9jJrwdf8rV3bN3a2fftdU4hq0-Ock';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ── SAVE ──────────────────────────────────────────────────────────────
+async function saveProcess() {
+    const num = $('in-processo').value.trim();
+    if (!num) { toast('Informe o Nº do Processo', 'error'); return; }
+    const conclusaoNode = document.querySelector('input[name="conclusao"]:checked');
+    const isEdit = !!$('processo-id').value;
+    const record = {
+        id:          $('processo-id').value || Date.now().toString(),
+        processo:    num,
+        setor:       $('in-setor').value,
+        objeto:      $('in-objeto').value,
+        modalidade:  $('in-modalidade').value,
+        criterio:    $('in-criterio').value,
+        data:        $('in-data').value || null,
+        observacoes: $('in-observacoes').value,
+        conclusao:   conclusaoNode ? conclusaoNode.value : '',
+        checks:      Array.from(document.querySelectorAll('.ck')).map(c => c.checked),
+        updated_at:  new Date().toISOString(),
+        user_id:     _currentUser?.id
+    };
+
+    const btnSave = document.querySelector('.btn-success');
+    btnSave.disabled = true;
+    btnSave.textContent = '⏳ Salvando…';
+
+    const { error } = await supa.from('processos').upsert(record, { onConflict: 'id' });
+
+    btnSave.disabled = false;
+    btnSave.textContent = isEdit ? '💾 Salvar Alterações' : '💾 Salvar';
+
+    if (error) { toast('Erro ao salvar: ' + error.message, 'error'); return; }
+
+    toast(isEdit ? `Processo ${num} atualizado! ✔` : 'Processo salvo com sucesso! ✔');
+    clearEditMode();
+    clearFormSilent();
+    openTab('list');
+}
+
+// ── LOAD TABLE ────────────────────────────────────────────────────────
+async function loadTable() {
+    const tbody = $('table-body');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--gray-500);">⏳ Carregando…</td></tr>';
+
+    const { data: list, error } = await supa
+        .from('processos')
+        .select('*')
+        .eq('user_id', _currentUser?.id)
+        .order('updated_at', { ascending: false });
+
+    tbody.innerHTML = '';
+
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">⚠️</div><p>Erro ao carregar: ${error.message}</p></div></td></tr>`;
+        return;
+    }
+    if (!list || !list.length) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📂</div><p>Nenhum processo salvo ainda.</p></div></td></tr>';
+        return;
+    }
+
+    const badgeMap = { regular: 'regular', ressalvas: 'ressalvas', irregular: 'irregular', '': 'pendente' };
+    const labelMap = { regular: '✅ Regular', ressalvas: '⚠️ Com Ressalvas', irregular: '❌ Irregular', '': '— Pendente' };
+
+    list.forEach(p => {
+        const status     = p.conclusao || '';
+        const isEditing  = _editingId === p.id;
+        const updatedStr = p.updated_at
+            ? new Date(p.updated_at).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+            : '—';
+        const tr = document.createElement('tr');
+        if (isEditing) tr.classList.add('editing-row');
+        tr.id = 'row-' + p.id;
+        tr.innerHTML = `
+            <td><strong>${p.processo}</strong>${isEditing ? ' <span style="font-size:.7rem;background:#f59e0b;color:white;padding:1px 7px;border-radius:99px;font-weight:700;">editando</span>' : ''}</td>
+            <td>${p.setor || '—'}</td>
+            <td>${p.modalidade || '—'}</td>
+            <td>${p.data ? new Date(p.data + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+            <td><span class="badge ${badgeMap[status]}">${labelMap[status]}</span></td>
+            <td style="font-size:.78rem;color:var(--gray-500);">${updatedStr}</td>
+            <td>
+                <button class="btn-sm open" onclick="openSaved('${p.id}')">✏️ Editar</button>
+                <button class="btn-sm del"  onclick="deleteProcess('${p.id}')">🗑️</button>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+// ── OPEN SAVED ────────────────────────────────────────────────────────
+async function openSaved(id) {
+    if (_editingId && _editingId !== id) {
+        if (!confirm('Você está editando outro processo. Descartar alterações e abrir este?')) return;
+    }
+
+    const { data, error } = await supa.from('processos').select('*').eq('id', id).single();
+    if (error || !data) { toast('Erro ao carregar processo.', 'error'); return; }
+
+    const p = data;
+    $('processo-id').value    = p.id;
+    $('in-processo').value    = p.processo;
+    $('in-setor').value       = p.setor;
+    $('in-objeto').value      = p.objeto;
+    $('in-modalidade').value  = p.modalidade;
+    $('in-criterio').value    = p.criterio;
+    $('in-data').value        = p.data || '';
+    $('in-observacoes').value = p.observacoes;
+
+    document.querySelectorAll('input[name="conclusao"]').forEach(r => { r.checked = r.value === p.conclusao; });
+    document.querySelectorAll('.radio-label').forEach(l => {
+        l.className = 'radio-label';
+        if (l.dataset.val === p.conclusao) l.classList.add('selected-' + p.conclusao);
+    });
+
+    const cks = document.querySelectorAll('.ck');
+    (p.checks || []).forEach((v, i) => {
+        if (cks[i]) { cks[i].checked = v; cks[i].closest('.checklist-item')?.classList.toggle('is-checked', v); }
+    });
+    document.querySelectorAll('.alert-box').forEach(a => a.style.display = 'none');
+
+    updateProgress();
+    setEditMode(p.id, p.processo);
+    openTab('form');
+}
+
+// ── DELETE ────────────────────────────────────────────────────────────
+async function deleteProcess(id) {
+    if (!confirm('Excluir este processo? Essa ação não pode ser desfeita.')) return;
+    const { error } = await supa.from('processos').delete().eq('id', id);
+    if (error) { toast('Erro ao excluir: ' + error.message, 'error'); return; }
+    toast('Processo excluído.');
+    loadTable();
+}
+
+// ── CLEAR ─────────────────────────────────────────────────────────────
+function clearFormWithConfirm() {
+    const msg = _editingId ? 'Descartar alterações e limpar o formulário?' : 'Limpar todos os campos?';
+    if (confirm(msg)) { clearEditMode(); clearFormSilent(); }
+}
+function clearFormSilent() {
+    $('processo-id').value = '';
+    document.querySelectorAll('#page-form input[type=text], #page-form input[type=date], #page-form textarea, #page-form select').forEach(el => el.value = '');
+    document.querySelectorAll('#page-form input[type=radio], #page-form input[type=checkbox]').forEach(el => { el.checked = false; el.closest('.checklist-item')?.classList.remove('is-checked'); });
+    document.querySelectorAll('.radio-label').forEach(l => l.className = 'radio-label');
+    document.querySelectorAll('.alert-box').forEach(a => a.style.display = 'none');
+    updateProgress();
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────────────────
+async function exportCSV() {
+    const { data: list, error } = await supa.from('processos').select('*').eq('user_id', _currentUser?.id).order('updated_at', { ascending: false });
+    if (error || !list?.length) { toast('Nenhum processo para exportar.', 'error'); return; }
+    let csv = '\uFEFFNº Processo;Setor;Modalidade;Critério;Data;Status;Objeto;Observações\n';
+    list.forEach(p => { csv += `"${p.processo}";"${p.setor}";"${p.modalidade}";"${p.criterio}";"${p.data}";"${p.conclusao}";"${p.objeto}";"${p.observacoes}"\n`; });
+    const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })),
+        download: 'Controle_Interno_SAAETRI.csv'
+    });
+    a.click();
+}
+
+// ── MAPA DE JUSTIFICATIVAS LEGAIS (id → texto) ────────────────────────
+const JUSTIFICATIVAS_LEGAIS = {
+    'c1-1': { tipo: 'warn',  texto: 'A ausência pode ser justificada apenas em contratações diretas por pequeno valor ou emergência (Art. 72, I c/c Art. 75, Lei 14.133/21).' },
+    'c1-2': { tipo: 'warn',  texto: 'Facultativo em contratações de baixo valor ou dispensável nos casos previstos em regulamento local (Art. 18, § 1º, Lei 14.133/21).' },
+    'c1-3': { tipo: 'warn',  texto: 'Obrigatório apenas para contratações de grande vulto ou regimes de contratação integrada/semi-integrada (Art. 22, Lei 14.133/21).' },
+    'c1-4': { tipo: 'error', texto: 'Documento essencial e obrigatório para a caracterização técnica do objeto (Art. 18, II, Lei 14.133/21). Regularização necessária.' },
+    'c1-5': { tipo: 'error', texto: 'Obrigatória a comprovação da compatibilidade da estimativa de despesa com os preços de mercado (Art. 23, Lei 14.133/21).' },
+    'c1-6': { tipo: 'error', texto: 'Indicação da dotação orçamentária é requisito essencial da fase preparatória (Art. 18, VIII, Lei 14.133/21).' },
+    'c1-7': { tipo: 'warn',  texto: 'Dispensáveis quando o contrato for substituído por instrumento equivalente (ex: nota de empenho) em compras com entrega imediata (Art. 95, Lei 14.133/21).' },
+    'c1-8': { tipo: 'warn',  texto: 'Dispensável em contratações diretas de pequeno valor ou havendo parecer jurídico referencial (Art. 53, § 5º, Lei 14.133/21).' },
+    'c1-9': { tipo: 'error', texto: 'Aprovação formal da autoridade competente é obrigatória para prosseguimento do feito (Art. 71, Lei 14.133/21).' },
+};
+
+// ── ABRE MODAL DE JUSTIFICATIVAS ──────────────────────────────────────
+function abrirModalJustificativas() {
+    // Coleta itens não marcados
+    const pendentes = [];
+    document.querySelectorAll('.check-group').forEach(group => {
+        const cb   = group.querySelector('.ck');
+        const span = group.querySelector('.checklist-item span');
+        if (!cb || !span || cb.checked) return;
+        const card = group.closest('.card');
+        const cardTitleEl = card ? (card.querySelector('.card-title span') || card.querySelector('.card-title')) : null;
+        const fase = cardTitleEl ? cardTitleEl.textContent.trim() : '';
+        const jus  = cb.id ? JUSTIFICATIVAS_LEGAIS[cb.id] : null;
+        pendentes.push({ id: cb.id || '', texto: span.innerText.replace(/\s+/g,' ').trim(), fase, jus });
+    });
+
+    const body = $('modal-jus-body');
+
+    if (!pendentes.length) {
+        body.innerHTML = `<div class="modal-empty"><div class="icon">✅</div><p>Todos os itens estão marcados como atendidos.<br>O PDF será gerado sem pendências.</p></div>`;
+        $('modal-jus-count').textContent = '0 pendências';
+        $('modal-overlay-data', pendentes);
+        window._modalPendentes = pendentes;
+        $('modal-jus').classList.add('open');
+        return;
+    }
+
+    body.innerHTML = pendentes.map((p, i) => {
+        const tipoClass = p.jus?.tipo === 'error' ? 'error-legal' : '';
+        const tipoIcon  = p.jus?.tipo === 'error' ? '❌ Falha Grave:' : '⚠️ Avaliação Legal:';
+        const jusHtml   = p.jus ? `
+            <div class="jus-item-legal ${tipoClass}"><strong>${tipoIcon}</strong> ${p.jus.texto}</div>` : '';
+        return `
+        <div class="jus-item" id="jus-item-${i}">
+            <div class="jus-item-header" onclick="toggleJusItem(${i})">
+                <input type="checkbox" id="jus-chk-${i}" checked onchange="updateJusCount(); event.stopPropagation();">
+                <div>
+                    <div class="jus-item-title">${p.texto}</div>
+                    <div class="jus-item-fase">${p.fase}</div>
+                </div>
+            </div>
+            ${jusHtml}
+            <label class="jus-custom-label" for="jus-obs-${i}">Justificativa personalizada (opcional):</label>
+            <textarea class="jus-custom-input" id="jus-obs-${i}" placeholder="Digite uma justificativa adicional para este item…"></textarea>
+        </div>`;
+    }).join('');
+
+    window._modalPendentes = pendentes;
+    updateJusCount();
+    $('modal-jus').classList.add('open');
+}
+
+function toggleJusItem(i) {
+    const chk = $(`jus-chk-${i}`);
+    chk.checked = !chk.checked;
+    $(`jus-item-${i}`).classList.toggle('selected', chk.checked);
+    updateJusCount();
+}
+
+function updateJusCount() {
+    const total    = (window._modalPendentes || []).length;
+    const selected = document.querySelectorAll('#modal-jus-body input[type=checkbox]:checked').length;
+    $('modal-jus-count').textContent = `${selected} de ${total} pendência${total !== 1 ? 's' : ''} selecionada${selected !== 1 ? 's' : ''}`;
+    // Marca visualmente os selecionados
+    document.querySelectorAll('#modal-jus-body .jus-item').forEach((el, i) => {
+        const chk = $(`jus-chk-${i}`);
+        if (chk) el.classList.toggle('selected', chk.checked);
+    });
+}
+
+function closeModal() { $('modal-jus').classList.remove('open'); }
+
+// ── GERA PDF COM JUSTIFICATIVAS SELECIONADAS ──────────────────────────
+function confirmarPDF() {
+    const pendentes = window._modalPendentes || [];
+    // Monta lista de justificativas selecionadas para passar ao generatePDF
+    const justificativasSelecionadas = pendentes.map((p, i) => {
+        const chk = $(`jus-chk-${i}`);
+        if (!chk || !chk.checked) return null;
+        const obs = ($(`jus-obs-${i}`)?.value || '').trim();
+        return { texto: p.texto, fase: p.fase, legal: p.jus?.texto || '', tipo: p.jus?.tipo || 'warn', obs };
+    }).filter(Boolean);
+
+    closeModal();
+    generatePDF(justificativasSelecionadas);
+}
+
+// ── BOTÃO PDF ABRE MODAL PRIMEIRO ─────────────────────────────────────
+function abrirPDF() {
+    abrirModalJustificativas();
+}
+function generatePDF(justificativasSelecionadas = []) {
+    const btn = $('btn-pdf'), loader = $('loader');
+
+    // ── Coleta de dados ────────────────────────────────────────────────
+    const processo   = $('in-processo').value.trim() || '(não informado)';
+    const setor      = $('in-setor').value.trim()    || '(não informado)';
+    const objeto     = $('in-objeto').value.trim()   || '(não informado)';
+    const modalidade = $('in-modalidade').value      || '(não informado)';
+    const criterio   = $('in-criterio').value        || '(não informado)';
+    const dataRaw    = $('in-data').value;
+    const observacoes= $('in-observacoes').value.trim();
+    const conclusaoNode = document.querySelector('input[name="conclusao"]:checked');
+    const conclusao  = conclusaoNode ? conclusaoNode.value : '';
+
+    const dataFmt = dataRaw
+        ? new Date(dataRaw + 'T00:00:00').toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' })
+        : new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+
+    // ── Mapa de todos os itens do checklist (texto + checked) ──────────
+    const FASES = [
+        {
+            titulo: '1. FASE PREPARATÓRIA',
+            itens: []
+        },
+        {
+            titulo: '2. FASE EXTERNA',
+            itens: []
+        },
+        {
+            titulo: '3. HABILITAÇÃO E JULGAMENTO',
+            itens: []
+        },
+        {
+            titulo: '4. HOMOLOGAÇÃO E CONTRATAÇÃO',
+            itens: []
+        }
+    ];
+
+    // Mapeia cada .check-group para a fase correta pela ordem no DOM
+    const allGroups = Array.from(document.querySelectorAll('.check-group'));
+    // Identifica qual card pertence cada grupo
+    allGroups.forEach(group => {
+        const cb   = group.querySelector('.ck');
+        const span = group.querySelector('.checklist-item span');
+        if (!cb || !span) return;
+        const card = group.closest('.card');
+        const cardTitle = card ? (card.querySelector('.card-title span') || card.querySelector('.card-title'))?.textContent?.trim() : '';
+        let faseIdx = 0;
+        if (cardTitle.includes('2.') || cardTitle.includes('Fase Externa')) faseIdx = 1;
+        else if (cardTitle.includes('3.') || cardTitle.includes('Habilitação')) faseIdx = 2;
+        else if (cardTitle.includes('4.') || cardTitle.includes('Homologação')) faseIdx = 3;
+        FASES[faseIdx].itens.push({ texto: span.innerText.replace(/\s+/g,' ').trim(), checked: cb.checked });
+    });
+
+    // ── Separa pendências (não marcados) ───────────────────────────────
+    const pendencias = [];
+    FASES.forEach(f => f.itens.forEach(i => { if (!i.checked) pendencias.push({ fase: f.titulo, texto: i.texto }); }));
+
+    const totalItens  = FASES.reduce((s, f) => s + f.itens.length, 0);
+    const totalOk     = FASES.reduce((s, f) => s + f.itens.filter(i => i.checked).length, 0);
+    const pctOk       = totalItens ? Math.round(totalOk / totalItens * 100) : 0;
+
+    // ── Textos do parecer por conclusão ───────────────────────────────
+    const conclusaoTextos = {
+        regular: {
+            titulo:  'REGULAR',
+            cor:     '#166534',
+            fundo:   '#dcfce7',
+            borda:   '#16a34a',
+            icone:   '✅',
+            texto:   `Após análise minuciosa dos autos e verificação dos ${totalItens} (${porExtenso(totalItens)}) requisitos legais aplicáveis ao procedimento licitatório, este Órgão de Controle Interno conclui que o Processo Administrativo nº <strong>${processo}</strong> encontra-se em conformidade com as exigências da Lei Federal nº 14.133/2021 e demais normas pertinentes, não sendo identificadas irregularidades ou omissões que comprometam a lisura do certame. Todos os documentos essenciais estão presentes, as formalidades legais foram observadas e a instrução processual está completa. Manifesta-se, portanto, pela <strong>APROVAÇÃO</strong> do prosseguimento do feito.`
+        },
+        ressalvas: {
+            titulo:  'COM RESSALVAS',
+            cor:     '#78350f',
+            fundo:   '#fef3c7',
+            borda:   '#f59e0b',
+            icone:   '⚠️',
+            texto:   `Após análise dos autos do Processo Administrativo nº <strong>${processo}</strong>, este Órgão de Controle Interno identificou que ${totalOk} (${porExtenso(totalOk)}) dos ${totalItens} (${porExtenso(totalItens)}) itens verificados encontram-se em conformidade com a Lei Federal nº 14.133/2021. Contudo, foram constatadas pendências ou inconsistências pontuais que, embora não inviabilizem o prosseguimento do certame, requerem atenção e devem ser sanadas no prazo que for estipulado pela autoridade competente, sob pena de comprometimento da regularidade do processo. Manifesta-se pelo <strong>PROSSEGUIMENTO COM RESSALVAS</strong>, condicionado ao saneamento das irregularidades apontadas.`
+        },
+        irregular: {
+            titulo:  'IRREGULAR',
+            cor:     '#7f1d1d',
+            fundo:   '#fee2e2',
+            borda:   '#ef4444',
+            icone:   '❌',
+            texto:   `Após análise detalhada dos autos do Processo Administrativo nº <strong>${processo}</strong>, este Órgão de Controle Interno verificou que apenas ${totalOk} (${porExtenso(totalOk)}) dos ${totalItens} (${porExtenso(totalItens)}) requisitos legais estão atendidos, correspondendo a ${pctOk}% de conformidade. Foram identificadas falhas graves e/ou omissões documentais que impedem o regular prosseguimento do certame, em desacordo com as disposições da Lei Federal nº 14.133/2021. A instrução processual apresenta-se incompleta, sendo imprescindível o <strong>SANEAMENTO</strong> das irregularidades apontadas antes de qualquer ato subsequente. Manifesta-se pelo <strong>SOBRESTAMENTO DO PROCESSO</strong> até a regularização integral das pendências.`
+        },
+        '': {
+            titulo:  'PENDENTE',
+            cor:     '#374151',
+            fundo:   '#f3f4f6',
+            borda:   '#9ca3af',
+            icone:   '—',
+            texto:   `A análise do Processo Administrativo nº <strong>${processo}</strong> encontra-se em andamento. Este documento representa o estado atual da verificação dos requisitos legais, não constituindo parecer definitivo.`
+        }
+    };
+
+    const ct = conclusaoTextos[conclusao] || conclusaoTextos[''];
+
+    // ── Monta bloco de cada fase ───────────────────────────────────────
+    function renderFase(fase) {
+        const rows = fase.itens.map(i => `
+            <tr>
+                <td style="width:28px;text-align:center;padding:7px 6px;">${i.checked ? '<span style="color:#16a34a;font-size:1rem;">✔</span>' : '<span style="color:#dc2626;font-size:1rem;">✘</span>'}</td>
+                <td style="padding:7px 10px;font-size:10.5pt;line-height:1.5;color:${i.checked ? '#1e293b' : '#7f1d1d'};">${i.texto}</td>
+                <td style="width:90px;text-align:center;padding:7px 6px;">
+                    <span style="display:inline-block;padding:2px 10px;border-radius:99px;font-size:8.5pt;font-weight:700;
+                        background:${i.checked ? '#dcfce7' : '#fee2e2'};
+                        color:${i.checked ? '#166534' : '#991b1b'};">
+                        ${i.checked ? 'ATENDIDO' : 'PENDENTE'}
+                    </span>
+                </td>
+            </tr>`).join('');
+        return `
+            <div style="margin-bottom:18px;page-break-inside:avoid;">
+                <div style="background:#1e3a5f;color:white;padding:7px 14px;font-size:9pt;font-weight:700;letter-spacing:.06em;border-radius:4px 4px 0 0;">${fase.titulo}</div>
+                <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 4px 4px;overflow:hidden;">
+                    <thead>
+                        <tr style="background:#f8fafc;">
+                            <th style="width:28px;padding:6px;font-size:8pt;color:#64748b;text-align:center;border-bottom:1px solid #e2e8f0;">OK</th>
+                            <th style="padding:6px 10px;font-size:8pt;color:#64748b;text-align:left;border-bottom:1px solid #e2e8f0;">REQUISITO LEGAL</th>
+                            <th style="width:90px;padding:6px;font-size:8pt;color:#64748b;text-align:center;border-bottom:1px solid #e2e8f0;">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+    }
+
+    // ── Bloco de pendências (usa justificativas selecionadas no modal) ──
+    let blocoPendencias = '';
+    // Usa as justificativas escolhidas no modal; se nenhuma foi passada, usa todas as pendências sem justificativa
+    const pendenciasParaPDF = justificativasSelecionadas.length > 0
+        ? justificativasSelecionadas
+        : pendencias.map(p => ({ ...p, legal: '', tipo: 'warn', obs: '' }));
+
+    if (pendenciasParaPDF.length > 0) {
+        const lisPend = pendenciasParaPDF.map((p, i) => {
+            const corBorda = p.tipo === 'error' ? '#fecaca' : '#fde68a';
+            const corFundo = p.tipo === 'error' ? '#fff5f5' : '#fffbeb';
+            const corTitulo= p.tipo === 'error' ? '#991b1b' : '#78350f';
+            const icone    = p.tipo === 'error' ? '❌' : '⚠️';
+            const legalHtml = p.legal ? `
+                <tr style="background:${corFundo};">
+                    <td></td>
+                    <td colspan="2" style="padding:4px 10px 10px;font-size:9pt;color:${corTitulo};line-height:1.5;border-top:1px dashed ${corBorda};">
+                        <strong>${icone} Fundamentação Legal:</strong> ${p.legal}
+                    </td>
+                </tr>` : '';
+            const obsHtml = p.obs ? `
+                <tr style="background:#f0f9ff;">
+                    <td></td>
+                    <td colspan="2" style="padding:4px 10px 10px;font-size:9pt;color:#1e40af;line-height:1.5;border-top:1px dashed #bfdbfe;">
+                        <strong>📝 Justificativa do Controlador:</strong> ${p.obs}
+                    </td>
+                </tr>` : '';
+            return `
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:8px 10px;width:24px;font-size:9pt;color:#64748b;font-weight:700;vertical-align:top;">${i+1}.</td>
+                    <td style="padding:8px 10px;font-size:9.5pt;color:#1e293b;line-height:1.5;font-weight:600;">${p.texto}</td>
+                    <td style="padding:8px 10px;width:140px;font-size:8pt;color:#64748b;font-style:italic;vertical-align:top;">${(p.fase||'').replace(/^\d+\. /,'')}</td>
+                </tr>
+                ${legalHtml}${obsHtml}`;
+        }).join('');
+
+        blocoPendencias = `
+            <div style="margin-bottom:20px;page-break-inside:avoid;">
+                <div style="background:#991b1b;color:white;padding:7px 14px;font-size:9pt;font-weight:700;letter-spacing:.06em;border-radius:4px 4px 0 0;">
+                    RELAÇÃO DE PENDÊNCIAS E IRREGULARIDADES (${pendenciasParaPDF.length} item${pendenciasParaPDF.length > 1 ? 's' : ''})
+                </div>
+                <table style="width:100%;border-collapse:collapse;border:1px solid #fecaca;border-top:none;">
+                    <tbody>${lisPend}</tbody>
+                </table>
+            </div>`;
+    }
+
+    // ── Bloco de observações ───────────────────────────────────────────
+    const blocoObs = observacoes ? `
+        <div style="margin-bottom:20px;page-break-inside:avoid;">
+            <div style="background:#1e3a5f;color:white;padding:7px 14px;font-size:9pt;font-weight:700;letter-spacing:.06em;border-radius:4px 4px 0 0;">OBSERVAÇÕES E RECOMENDAÇÕES DO CONTROLADOR</div>
+            <div style="border:1px solid #e2e8f0;border-top:none;padding:14px 16px;font-size:10.5pt;line-height:1.8;color:#1e293b;border-radius:0 0 4px 4px;white-space:pre-wrap;">${observacoes}</div>
+        </div>` : '';
+
+    // ── HTML COMPLETO DO PARECER ───────────────────────────────────────
+    const html = `<!DOCTYPE html>
+\x3Chtml lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=794">
+\x3Cstyle>
+    @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 794px; background: white; }
+    body { font-family: 'Source Sans 3', Arial, sans-serif; color: #1e293b; font-size: 11pt; line-height: 1.6; }
+    p { margin-bottom: .8em; }
+<\/style>
+<\/head>
+\x3Cbody>
+
+<!-- TOPO INSTITUCIONAL -->
+<div style="background:#002b52;padding:18px 40px 14px;display:flex;align-items:center;justify-content:space-between;">
+    <img src="https://saaetri.com.br/wp-content/uploads/2022/06/NOVA-LOGO-SAAETRI-ALTA-RESOLUCAO-1024x264.png"
+         style="height:38px;filter:brightness(0) invert(1);" alt="SAAETRI">
+    <div style="text-align:right;">
+        <div style="color:#b3d4f0;font-size:8pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">Órgão de Controle Interno</div>
+        <div style="color:white;font-size:9pt;font-weight:600;margin-top:2px;">SAAETRI — Serviço Autônomo de Água e Esgoto</div>
+    </div>
+</div>
+<div style="background:#0062b0;height:4px;"></div>
+
+<!-- CORPO DO DOCUMENTO -->
+<div style="padding:28px 40px 36px;width:794px;">
+
+    <!-- IDENTIFICAÇÃO DO DOCUMENTO -->
+    <div style="text-align:center;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #e2e8f0;">
+        <div style="font-size:8.5pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#64748b;margin-bottom:6px;">PARECER DE CONTROLE INTERNO</div>
+        <div style="font-family:'Lora',Georgia,serif;font-size:15pt;font-weight:700;color:#002b52;margin-bottom:4px;">
+            Auditoria de Processo Licitatório
+        </div>
+        <div style="font-size:9.5pt;color:#64748b;">Lei Federal nº 14.133, de 1º de abril de 2021</div>
+    </div>
+
+    <!-- DADOS DO PROCESSO -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px 20px;margin-bottom:22px;">
+        <div style="font-size:8pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">DADOS DE IDENTIFICAÇÃO DO PROCESSO</div>
+        <table style="width:100%;border-collapse:collapse;">
+            <tr>
+                <td style="padding:4px 0;font-size:9pt;font-weight:700;color:#64748b;width:200px;">Nº do Processo Administrativo:</td>
+                <td style="padding:4px 0;font-size:10.5pt;font-weight:700;color:#002b52;">${processo}</td>
+                <td style="padding:4px 0;font-size:9pt;font-weight:700;color:#64748b;width:150px;">Data da Análise:</td>
+                <td style="padding:4px 0;font-size:10.5pt;color:#1e293b;">${dataFmt}</td>
+            </tr>
+            <tr>
+                <td style="padding:4px 0;font-size:9pt;font-weight:700;color:#64748b;">Setor Requisitante:</td>
+                <td style="padding:4px 0;font-size:10.5pt;color:#1e293b;">${setor}</td>
+                <td style="padding:4px 0;font-size:9pt;font-weight:700;color:#64748b;">Modalidade:</td>
+                <td style="padding:4px 0;font-size:10.5pt;color:#1e293b;">${modalidade}</td>
+            </tr>
+            <tr>
+                <td style="padding:4px 0;font-size:9pt;font-weight:700;color:#64748b;vertical-align:top;">Objeto:</td>
+                <td colspan="3" style="padding:4px 0;font-size:10.5pt;color:#1e293b;">${objeto}</td>
+            </tr>
+            <tr>
+                <td style="padding:4px 0;font-size:9pt;font-weight:700;color:#64748b;">Critério de Julgamento:</td>
+                <td colspan="3" style="padding:4px 0;font-size:10.5pt;color:#1e293b;">${criterio}</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- RELATÓRIO DE CONFORMIDADE -->
+    <div style="margin-bottom:22px;">
+        <div style="font-family:'Lora',Georgia,serif;font-size:11pt;font-weight:700;color:#002b52;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #002b52;text-transform:uppercase;letter-spacing:.05em;">
+            I — RELATÓRIO DE CONFORMIDADE
+        </div>
+        <p style="font-size:10.5pt;text-align:justify;line-height:1.8;">
+            Trata-se de análise do Processo Administrativo nº <strong>${processo}</strong>, oriundo do <strong>${setor}</strong>, 
+            cujo objeto consiste em: <em>${objeto}</em>. A modalidade de contratação adotada é <strong>${modalidade}</strong>, 
+            com critério de julgamento pelo <strong>${criterio}</strong>.
+        </p>
+        <p style="font-size:10.5pt;text-align:justify;line-height:1.8;">
+            Procedeu-se à verificação dos requisitos legais exigidos pela Lei Federal nº 14.133/2021 e normas correlatas, 
+            distribuídos em <strong>${totalItens} (${porExtenso(totalItens)})</strong> itens de controle organizados nas quatro fases 
+            do procedimento licitatório. Foram atendidos <strong>${totalOk} (${porExtenso(totalOk)})</strong> requisitos, 
+            correspondendo a <strong>${pctOk}%</strong> de conformidade.
+        </p>
+    </div>
+
+    <!-- TABELAS DE VERIFICAÇÃO POR FASE -->
+    <div style="margin-bottom:22px;">
+        <div style="font-family:'Lora',Georgia,serif;font-size:11pt;font-weight:700;color:#002b52;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #002b52;text-transform:uppercase;letter-spacing:.05em;">
+            II — VERIFICAÇÃO POR FASE PROCESSUAL
+        </div>
+        ${FASES.map(renderFase).join('')}
+    </div>
+
+    <!-- PENDÊNCIAS -->
+    ${pendenciasParaPDF.length > 0 ? `
+    <div style="margin-bottom:22px;">
+        <div style="font-family:'Lora',Georgia,serif;font-size:11pt;font-weight:700;color:#002b52;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #002b52;text-transform:uppercase;letter-spacing:.05em;">
+            III — IRREGULARIDADES E PENDÊNCIAS IDENTIFICADAS
+        </div>
+        ${blocoPendencias}
+    </div>` : ''}
+
+    <!-- OBSERVAÇÕES -->
+    ${observacoes ? `
+    <div style="margin-bottom:22px;">
+        <div style="font-family:'Lora',Georgia,serif;font-size:11pt;font-weight:700;color:#002b52;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #002b52;text-transform:uppercase;letter-spacing:.05em;">
+            ${pendenciasParaPDF.length > 0 ? 'IV' : 'III'} — OBSERVAÇÕES E RECOMENDAÇÕES
+        </div>
+        ${blocoObs}
+    </div>` : ''}
+
+    <!-- CONCLUSÃO -->
+    <div style="margin-bottom:30px;">
+        <div style="font-family:'Lora',Georgia,serif;font-size:11pt;font-weight:700;color:#002b52;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #002b52;text-transform:uppercase;letter-spacing:.05em;">
+            ${pendenciasParaPDF.length > 0 ? (observacoes ? 'V' : 'IV') : (observacoes ? 'IV' : 'III')} — CONCLUSÃO E PARECER FINAL
+        </div>
+        <div style="border-left:5px solid ${ct.borda};background:${ct.fundo};padding:16px 20px;border-radius:0 6px 6px 0;margin-bottom:16px;">
+            <div style="font-size:9pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${ct.cor};margin-bottom:8px;">${ct.icone} PARECER — ${ct.titulo}</div>
+            <p style="font-size:10.5pt;color:${ct.cor};line-height:1.8;text-align:justify;margin:0;">${ct.texto}</p>
+        </div>
+        <p style="font-size:10pt;text-align:justify;line-height:1.8;color:#374151;">
+            É o parecer, que se submete à consideração da autoridade competente para as providências cabíveis. 
+            Rio das Ostras/RJ, ${dataFmt}.
+        </p>
+    </div>
+
+    <!-- ASSINATURA -->
+    <div style="margin-top:50px;display:flex;justify-content:center;">
+        <div style="text-align:center;width:340px;">
+            <div style="border-top:1.5px solid #334155;margin-bottom:10px;"></div>
+            <div style="font-size:10.5pt;font-weight:700;color:#1e293b;">Controlador Interno</div>
+            <div style="font-size:9pt;color:#64748b;margin-top:3px;">SAAETRI — Serviço Autônomo de Água e Esgoto de Três Rios</div>
+            <div style="font-size:8.5pt;color:#94a3b8;margin-top:2px;">Órgão de Controle Interno Municipal</div>
+        </div>
+    </div>
+
+</div><!-- /corpo -->
+
+<!-- RODAPÉ -->
+<div style="background:#f1f5f9;border-top:1px solid #e2e8f0;padding:10px 40px;display:flex;justify-content:space-between;align-items:center;margin-top:20px;width:794px;">
+    <div style="font-size:7.5pt;color:#94a3b8;">Processo nº ${processo} · ${setor}</div>
+    <div style="font-size:7.5pt;color:#94a3b8;">Documento gerado em ${new Date().toLocaleString('pt-BR')} · Controle Interno SAAETRI</div>
+</div>
+
+<\/body><\/html>`;
+
+    // ── Renderiza via html2canvas + jsPDF direto ──────────────────────
+    btn.style.display = 'none';
+    loader.classList.add('visible');
+
+    // Cria div fora da tela — html2canvas precisa que o elemento esteja
+    // realmente renderizado, não apenas no DOM
+    const wrap = document.createElement('div');
+    wrap.style.cssText = [
+        'position:absolute',
+        'top:0',
+        'left:-9999px',
+        'width:794px',
+        'background:white',
+        'z-index:-1'
+    ].join(';');
+    // Injeta apenas o body do HTML gerado (sem as tags html/head)
+    const parser = new DOMParser();
+    const parsedDoc = parser.parseFromString(html, 'text/html');
+    // Copia estilos inline
+    const styleTag = document.createElement('style');
+    styleTag.textContent = parsedDoc.querySelector('style') ? parsedDoc.querySelector('style').textContent : '';
+    wrap.appendChild(styleTag);
+    // Copia o body
+    wrap.insertAdjacentHTML('beforeend', parsedDoc.body.innerHTML);
+    document.body.appendChild(wrap);
+
+    // Aguarda imagens e fontes carregarem
+    setTimeout(async () => {
+        try {
+            const { jsPDF } = window.jspdf;
+
+            // Verifica se as libs estão disponíveis
+            if (!window.html2canvas) throw new Error('html2canvas não carregou');
+            if (!window.jspdf)       throw new Error('jsPDF não carregou');
+
+            // Captura o conteúdo total em canvas
+            const canvas = await html2canvas(wrap, {
+                scale: 2,
+                useCORS: true,
+                letterRendering: true,
+                logging: false,
+                width: 794,
+                windowWidth: 794,
+                backgroundColor: '#ffffff'
+            });
+
+            const imgWidthPx  = canvas.width;
+            const imgHeightPx = canvas.height;
+
+            // Escala: largura do canvas (px, scale=2) → 210mm A4
+            const PX_PER_MM = imgWidthPx / 210;   // px por mm
+            const PAGE_H_PX = Math.round(297 * PX_PER_MM); // altura de 1 página em px
+
+            // ── Coleta os limites inferiores (bottom) de cada bloco relevante ──
+            // Usamos os filhos diretos do wrap para encontrar pontos seguros de corte
+            const safeBreaks = new Set([0]);
+            const wrapTop = wrap.getBoundingClientRect().top + window.scrollY;
+
+            wrap.querySelectorAll('div[style*="page-break"], .check-group, table, div[style*="margin-bottom"]')
+                .forEach(el => {
+                    const r = el.getBoundingClientRect();
+                    const bottomPx = (r.bottom + window.scrollY - wrapTop) * 2; // *2 por scale
+                    if (bottomPx > 0 && bottomPx < imgHeightPx) safeBreaks.add(Math.round(bottomPx));
+                });
+
+            // Garante que o fim do documento seja incluído
+            safeBreaks.add(imgHeightPx);
+            const breakPoints = Array.from(safeBreaks).sort((a, b) => a - b);
+
+            // ── Agrupa breakPoints em páginas sem ultrapassar PAGE_H_PX ──
+            const pages = [];   // cada entry = { startPx, endPx }
+            let pageStart = 0;
+
+            while (pageStart < imgHeightPx) {
+                const pageEnd = pageStart + PAGE_H_PX;
+
+                if (pageEnd >= imgHeightPx) {
+                    // Última página — pega o restante
+                    pages.push({ startPx: pageStart, endPx: imgHeightPx });
+                    break;
+                }
+
+                // Encontra o breakPoint mais próximo ABAIXO de pageEnd
+                // (ou seja, o último ponto seguro antes de ultrapassar a página)
+                let bestBreak = pageEnd; // fallback: corta no limite da página
+                for (let i = breakPoints.length - 1; i >= 0; i--) {
+                    if (breakPoints[i] <= pageEnd) {
+                        bestBreak = breakPoints[i];
+                        break;
+                    }
+                }
+
+                // Se o bestBreak for igual ao pageStart (bloco maior que página inteira),
+                // força o corte no limite para não entrar em loop infinito
+                if (bestBreak <= pageStart) bestBreak = pageEnd;
+
+                pages.push({ startPx: pageStart, endPx: bestBreak });
+                pageStart = bestBreak;
+            }
+
+            // ── Gera o PDF página a página ────────────────────────────────
+            const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+            for (let i = 0; i < pages.length; i++) {
+                if (i > 0) pdf.addPage();
+
+                const { startPx, endPx } = pages[i];
+                const sliceHeightPx = endPx - startPx;
+                const sliceHeightMm = sliceHeightPx / PX_PER_MM;
+
+                // Fatia do canvas para esta página
+                const sliceCanvas = document.createElement('canvas');
+                sliceCanvas.width  = imgWidthPx;
+                sliceCanvas.height = sliceHeightPx;
+                const ctx = sliceCanvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+                ctx.drawImage(canvas,
+                    0, startPx, imgWidthPx, sliceHeightPx,
+                    0, 0,       imgWidthPx, sliceHeightPx);
+
+                const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.97);
+                // Centraliza verticalmente se a fatia for menor que a página
+                const offsetY = sliceHeightMm < 297 ? 0 : 0;
+                pdf.addImage(sliceData, 'JPEG', 0, offsetY, 210, sliceHeightMm);
+            }
+
+            pdf.save(`Parecer_CI_${processo.replace(/\//g, '-')}.pdf`);
+            toast('Parecer gerado com sucesso! ✔');
+        } catch (err) {
+            console.error('PDF error:', err);
+            toast('Erro ao gerar PDF: ' + err.message, 'error');
+        } finally {
+            document.body.removeChild(wrap);
+            loader.classList.remove('visible');
+            btn.style.display = '';
+        }
+    }, 1500);
+}
+
+// ── Número por extenso (básico, até 22) ───────────────────────────────
+function porExtenso(n) {
+    const t = ['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove',
+               'dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete',
+               'dezoito','dezenove','vinte','vinte e um','vinte e dois'];
+    return t[n] || n;
+}
+
+// ── CONTROLE DE PRAZOS ────────────────────────────────────────────────
+let _todosPrazos   = [];
+let _filtroAtivo   = 'todos';
+
+// Preview da data limite ao preencher os campos
+['prazo-inicio','prazo-dias'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', atualizarPreviewPrazo);
+});
+
+function atualizarPreviewPrazo() {
+    const inicio = $('prazo-inicio')?.value;    const dias   = parseInt($('prazo-dias')?.value || '0');
+    const prev   = $('prazo-preview');
+    const prevData = $('prazo-preview-data');
+    if (!prev || !prevData) return;
+    if (inicio && dias > 0) {
+        const limite = new Date(inicio + 'T00:00:00');
+        limite.setDate(limite.getDate() + dias);
+        prevData.textContent = limite.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+        prev.style.display = 'block';
+    } else {
+        prev.style.display = 'none';
+    }
+}
+
+function calcStatus(dataLimite, situacao) {
+    if (situacao === 'concluido') return 'concluido';
+    if (situacao === 'saiu')      return 'saiu';
+    const hoje  = new Date(); hoje.setHours(0,0,0,0);
+    const limit = new Date(dataLimite + 'T00:00:00');
+    const diff  = Math.ceil((limit - hoje) / 86400000);
+    if (diff < 0)  return 'vencido';
+    if (diff <= 5) return 'urgente';
+    return 'ok';
+}
+
+function diasLabel(dataLimite, situacao) {
+    if (situacao === 'concluido') return '🏁 Concluído';
+    if (situacao === 'saiu')      return '📤 Saiu do prazo';
+    const hoje  = new Date(); hoje.setHours(0,0,0,0);
+    const limit = new Date(dataLimite + 'T00:00:00');
+    const diff  = Math.ceil((limit - hoje) / 86400000);
+    if (diff < 0)  return `⛔ Vencido há ${Math.abs(diff)} dia${Math.abs(diff)!==1?'s':''}`;
+    if (diff === 0) return '🔴 Vence hoje!';
+    if (diff <= 5) return `⚠️ Vence em ${diff} dia${diff!==1?'s':''}`;
+    return `✅ ${diff} dia${diff!==1?'s':''} restante${diff!==1?'s':''}`;
+}
+
+function pctDecorrido(inicio, limite, situacao) {
+    if (situacao === 'concluido' || situacao === 'saiu') return 100;
+    const s = new Date(inicio   + 'T00:00:00').getTime();
+    const e = new Date(limite   + 'T00:00:00').getTime();
+    const n = new Date().getTime();
+    if (e === s) return 100;
+    return Math.min(100, Math.max(0, Math.round((n - s) / (e - s) * 100)));
+}
+
+function corBarra(status) {
+    return { vencido:'#ef4444', urgente:'#f59e0b', ok:'#22c55e', concluido:'#9ca3af', saiu:'#0073cc' }[status] || '#9ca3af';
+}
+
+async function carregarPrazos() {
+    const lista = $('prazos-lista');
+    lista.innerHTML = '<div class="prazos-empty"><div class="icon">⏳</div><p>Carregando…</p></div>';
+
+    const { data, error } = await supa
+        .from('prazos')
+        .select('*')
+        .eq('user_id', _currentUser?.id)
+        .order('data_limite', { ascending: true });
+
+    if (error) { lista.innerHTML = `<div class="prazos-empty"><p>Erro: ${error.message}</p></div>`; return; }
+
+    _todosPrazos = data || [];
+    renderPrazos();
+    atualizarStatsPrazos();
+}
+
+function renderPrazos() {
+    const lista = $('prazos-lista');
+    let itens = _todosPrazos;
+
+    if (_filtroAtivo.startsWith('t:')) {
+        // Filtro por tipo
+        const tipoFiltro = _filtroAtivo.replace('t:', '');
+        itens = itens.filter(p => (p.tipo || 'outros') === tipoFiltro);
+    } else if (_filtroAtivo !== 'todos') {
+        itens = itens.filter(p => calcStatus(p.data_limite, p.situacao) === _filtroAtivo);
+    }
+
+    if (!itens.length) {
+        lista.innerHTML = '<div class="prazos-empty"><div class="icon">⏱️</div><p>Nenhum prazo encontrado.</p></div>';
+        return;
+    }
+
+    lista.innerHTML = itens.map(p => {
+        const status = calcStatus(p.data_limite, p.situacao);
+        const label  = diasLabel(p.data_limite, p.situacao);
+        const pct    = pctDecorrido(p.data_inicio, p.data_limite, p.situacao);
+        const cor    = corBarra(status);
+        const limiteFmt = new Date(p.data_limite + 'T00:00:00').toLocaleDateString('pt-BR');
+        const chegadaFmt = new Date(p.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR');
+
+        // Calcula quantos dias demorou para ficar pronto (concluido ou saiu)
+        let diasParaProntoHtml = '';
+        if (p.situacao === 'concluido' || p.situacao === 'saiu') {
+            const chegada  = new Date(p.data_inicio + 'T00:00:00');
+            const fim      = p.updated_at ? new Date(p.updated_at) : new Date();
+            fim.setHours(0,0,0,0);
+            const diasDemorou = Math.max(0, Math.ceil((fim - chegada) / 86400000));
+            const dentroFora  = diasDemorou <= p.prazo_dias
+                ? `<span style="color:#166534;font-weight:700;">✅ dentro do prazo</span>`
+                : `<span style="color:#991b1b;font-weight:700;">❌ fora do prazo (${diasDemorou - p.prazo_dias} dia${diasDemorou - p.prazo_dias !== 1 ? 's' : ''} de atraso)</span>`;
+            diasParaProntoHtml = `
+                <div style="margin-top:8px;padding:8px 12px;background:var(--gray-50);border-radius:6px;font-size:.82rem;color:var(--gray-700);border:1px solid var(--gray-200);">
+                    🕐 Demorou <strong>${diasDemorou} dia${diasDemorou !== 1 ? 's' : ''}</strong> para ficar pronto — ${dentroFora}
+                </div>`;
+        } else {
+            diasParaProntoHtml = '';
+        }
+        const tipo   = p.tipo || 'outros';
+        const tipoStyle = TIPO_COLOR[tipo] || TIPO_COLOR.outros;
+        const tipoBadge = `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:99px;font-size:.75rem;font-weight:700;background:${tipoStyle.bg};color:${tipoStyle.color};">${TIPO_LABEL[tipo] || tipo}</span>`;
+
+        const btnAcao = (p.situacao === 'em_andamento')
+            ? `<button class="btn-prazo concluir" onclick="mudarSituacaoPrazo('${p.id}','concluido')">🏁 Concluir</button>
+               <button class="btn-prazo saiu-btn" onclick="mudarSituacaoPrazo('${p.id}','saiu')">📤 Saiu</button>`
+            : `<button class="btn-prazo reabrir"  onclick="mudarSituacaoPrazo('${p.id}','em_andamento')">🔄 Reabrir</button>`;
+
+        return `
+        <div class="prazo-card ${status}">
+            <div class="prazo-card-top">
+                <div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        ${tipoBadge}
+                    </div>
+                    <div class="prazo-card-title">${p.processo}</div>
+                    <div class="prazo-card-desc">${p.descricao || '—'}</div>
+                </div>
+                <span class="dias-badge ${status}">${label}</span>
+            </div>
+            <div class="prazo-card-bottom">
+                <div class="prazo-progress">
+                    <div style="font-size:.72rem;color:var(--gray-500);margin-bottom:4px;">Chegada: ${chegadaFmt} → Limite: ${limiteFmt} · ${p.prazo_dias} dias · ${pct}% decorrido</div>
+                    <div class="prazo-progress-bar">
+                        <div class="prazo-progress-fill" style="width:${pct}%;background:${cor};"></div>
+                    </div>
+                </div>
+            </div>
+            ${diasParaProntoHtml}
+            ${p.observacao ? `<div style="margin-top:8px;font-size:.78rem;color:var(--gray-500);">📝 ${p.observacao}</div>` : ''}
+            <div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end;">
+                ${btnAcao}
+                <button class="btn-prazo editar"  onclick="editarPrazo('${p.id}')">✏️ Editar</button>
+                <button class="btn-prazo excluir" onclick="excluirPrazo('${p.id}')">🗑️</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function atualizarStatsPrazos() {
+    let vencido=0, urgente=0, ok=0, concluido=0;
+    _todosPrazos.forEach(p => {
+        const s = calcStatus(p.data_limite, p.situacao);
+        if (s==='vencido')   vencido++;
+        else if(s==='urgente') urgente++;
+        else if(s==='ok')    ok++;
+        else concluido++;
+    });
+    $('ps-vencido').textContent   = vencido;
+    $('ps-urgente').textContent   = urgente;
+    $('ps-ok').textContent        = ok;
+    $('ps-concluido').textContent = concluido;
+}
+
+function filtrarPrazos(filtro) {
+    _filtroAtivo = filtro;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filtro === filtro));
+    renderPrazos();
+}
+
+const TIPO_LABEL = {
+    pagamento: '💰 Pagamento',
+    licitacao: '📋 Licitação',
+    dispensa:  '📄 Dispensa',
+    outros:    '📁 Outros'
+};
+const TIPO_COLOR = {
+    pagamento: { bg:'#fef3c7', color:'#78350f' },
+    licitacao: { bg:'#dbeafe', color:'#1e40af' },
+    dispensa:  { bg:'#f3e8ff', color:'#6b21a8' },
+    outros:    { bg:'#f3f4f6', color:'#374151' }
+};
+
+async function salvarPrazo() {
+    const processo = $('prazo-processo').value.trim();
+    const inicio   = $('prazo-inicio').value;
+    const dias     = parseInt($('prazo-dias').value || '0');
+    if (!processo) { toast('Informe o nº do processo.', 'error'); return; }
+    if (!inicio)   { toast('Informe a data de início.', 'error'); return; }
+    if (!dias || dias < 1) { toast('Informe o prazo em dias.', 'error'); return; }
+
+    const tipoSel = document.querySelector('input[name="prazo-tipo"]:checked');
+    const record = {
+        id:          $('prazo-id').value || Date.now().toString(),
+        user_id:     _currentUser?.id,
+        processo,
+        descricao:   $('prazo-descricao').value.trim(),
+        data_inicio: inicio,
+        prazo_dias:  dias,
+        situacao:    'em_andamento',
+        tipo:        tipoSel ? tipoSel.value : 'outros',
+        observacao:  $('prazo-obs').value.trim(),
+        updated_at:  new Date().toISOString()
+    };
+
+    // Se editando, preserva a situação original
+    if ($('prazo-id').value) {
+        const original = _todosPrazos.find(p => p.id === record.id);
+        if (original) record.situacao = original.situacao;
+    }
+
+    const { error } = await supa.from('prazos').upsert(record, { onConflict: 'id' });
+    if (error) { toast('Erro ao salvar: ' + error.message, 'error'); return; }
+
+    toast($('prazo-id').value ? 'Prazo atualizado! ✔' : 'Prazo cadastrado! ✔');
+    limparPrazoForm();
+    carregarPrazos();
+}
+
+async function mudarSituacaoPrazo(id, situacao) {
+    const { error } = await supa.from('prazos').update({ situacao, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) { toast('Erro: ' + error.message, 'error'); return; }
+    const labels = { concluido:'Marcado como concluído ✔', saiu:'Marcado como saiu 📤', em_andamento:'Reaberto 🔄' };
+    toast(labels[situacao] || 'Atualizado!');
+    carregarPrazos();
+}
+
+function editarPrazo(id) {
+    const p = _todosPrazos.find(x => x.id === id);
+    if (!p) return;
+    $('prazo-id').value        = p.id;
+    $('prazo-processo').value  = p.processo;
+    $('prazo-descricao').value = p.descricao || '';
+    $('prazo-inicio').value    = p.data_inicio;
+    $('prazo-dias').value      = p.prazo_dias;
+    $('prazo-obs').value       = p.observacao || '';
+    // Restaura o tipo
+    const tipoVal = p.tipo || 'outros';
+    const tipoRadio = document.querySelector(`input[name="prazo-tipo"][value="${tipoVal}"]`);
+    if (tipoRadio) tipoRadio.checked = true;
+    $('prazo-form-title').textContent = '✏️ Editando Prazo';
+    atualizarPreviewPrazo();
+    $('page-prazos').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function excluirPrazo(id) {
+    if (!confirm('Excluir este prazo?')) return;
+    const { error } = await supa.from('prazos').delete().eq('id', id);
+    if (error) { toast('Erro: ' + error.message, 'error'); return; }
+    toast('Prazo excluído.');
+    carregarPrazos();
+}
+
+function limparPrazoForm() {
+    $('prazo-id').value = '';
+    ['prazo-processo','prazo-descricao','prazo-inicio','prazo-dias','prazo-obs'].forEach(id => {
+        const el = $(id); if (el) el.value = '';
+    });
+    // Reset tipo para "outros"
+    const outrosRadio = document.querySelector('input[name="prazo-tipo"][value="outros"]');
+    if (outrosRadio) outrosRadio.checked = true;
+    $('prazo-form-title').textContent = '➕ Novo Prazo';
+    $('prazo-preview').style.display = 'none';
+}
+
+
+
+// ── MAPA DE CERTIDÕES ESTADUAIS E MUNICIPAIS ─────────────────────────
+const CERT_ESTADUAIS = {
+    RJ: [
+        { nome: 'CND Estadual RJ', desc: 'Secretaria de Fazenda do RJ', url: c => `https://www4.fazenda.rj.gov.br/certidaoNegativaSefaz/faces/pesquisa.xhtml` },
+        { nome: 'Junta Comercial (JUCERJA)', desc: 'Atos constitutivos', url: c => `https://www.jucerja.rj.gov.br/` },
+        { nome: 'TCECRJ', desc: 'Tribunal de Contas do Estado RJ', url: c => `https://www.tce.rj.gov.br/` },
+    ],
+    SP: [
+        { nome: 'CND Estadual SP', desc: 'Secretaria da Fazenda SP', url: c => `https://www.fazenda.sp.gov.br/certidao/` },
+        { nome: 'Junta Comercial (JUCESP)', desc: 'Atos constitutivos', url: c => `https://www.jucesp.sp.gov.br/` },
+        { nome: 'TCESP', desc: 'Tribunal de Contas do Estado SP', url: c => `https://www.tce.sp.gov.br/` },
+    ],
+    MG: [
+        { nome: 'CND Estadual MG', desc: 'Secretaria da Fazenda MG', url: c => `https://www.fazenda.mg.gov.br/empresas/certidao_negativa/` },
+        { nome: 'Junta Comercial (JUCEMG)', desc: 'Atos constitutivos', url: c => `https://www.jucemg.mg.gov.br/` },
+    ],
+    RS: [
+        { nome: 'CND Estadual RS', desc: 'Secretaria da Fazenda RS', url: c => `https://www.sefaz.rs.gov.br/` },
+        { nome: 'Junta Comercial (JUCERGS)', desc: 'Atos constitutivos', url: c => `https://www.jucergs.rs.gov.br/` },
+    ],
+    BA: [
+        { nome: 'CND Estadual BA', desc: 'SEFAZ Bahia', url: c => `https://www.sefaz.ba.gov.br/certidao` },
+        { nome: 'Junta Comercial (JUCEB)', desc: 'Atos constitutivos', url: c => `https://www.juceb.ba.gov.br/` },
+    ],
+    SC: [
+        { nome: 'CND Estadual SC', desc: 'SEF Santa Catarina', url: c => `https://www.sef.sc.gov.br/` },
+        { nome: 'Junta Comercial (JUCESC)', desc: 'Atos constitutivos', url: c => `https://www.jucesc.sc.gov.br/` },
+    ],
+    PR: [
+        { nome: 'CND Estadual PR', desc: 'SEFA Paraná', url: c => `https://www.fazenda.pr.gov.br/` },
+        { nome: 'Junta Comercial (JUCEPAR)', desc: 'Atos constitutivos', url: c => `https://www.jucepar.pr.gov.br/` },
+    ],
+    GO: [
+        { nome: 'CND Estadual GO', desc: 'SEFAZ Goiás', url: c => `https://www.sefaz.go.gov.br/` },
+        { nome: 'Junta Comercial (JUCEG)', desc: 'Atos constitutivos', url: c => `https://www.juceg.go.gov.br/` },
+    ],
+    PE: [
+        { nome: 'CND Estadual PE', desc: 'SEFAZ Pernambuco', url: c => `https://www.sefaz.pe.gov.br/` },
+        { nome: 'Junta Comercial (JUCEPE)', desc: 'Atos constitutivos', url: c => `https://www.jucepe.pe.gov.br/` },
+    ],
+    CE: [
+        { nome: 'CND Estadual CE', desc: 'SEFAZ Ceará', url: c => `https://www.sefaz.ce.gov.br/` },
+        { nome: 'Junta Comercial (JUCEC)', desc: 'Atos constitutivos', url: c => `https://www.jucec.ce.gov.br/` },
+    ],
+    MT: [
+        { nome: 'CND Estadual MT', desc: 'SEFAZ Mato Grosso', url: c => `https://www.sefaz.mt.gov.br/` },
+        { nome: 'Junta Comercial (JUCEMAT)', desc: 'Atos constitutivos', url: c => `https://www.jucemat.mt.gov.br/` },
+    ],
+    MS: [
+        { nome: 'CND Estadual MS', desc: 'SEFAZ Mato Grosso do Sul', url: c => `https://www.sefaz.ms.gov.br/` },
+        { nome: 'Junta Comercial (JUCEMS)', desc: 'Atos constitutivos', url: c => `https://www.jucems.ms.gov.br/` },
+    ],
+};
+
+// Municípios com certidão municipal online conhecida
+const CERT_MUNICIPAIS = {
+    'RIO DE JANEIRO': { nome: 'CND Municipal RJ', desc: 'Secretaria Municipal de Fazenda', url: c => `https://certidoes.fazenda.prefeitura.rio/` },
+    'SAO PAULO':      { nome: 'CND Municipal SP', desc: 'Secretaria Municipal de Finanças', url: c => `https://www.prefeitura.sp.gov.br/cidade/secretarias/financas/servicos/certidoes/` },
+    'BELO HORIZONTE': { nome: 'CND Municipal BH', desc: 'SMAR Belo Horizonte', url: c => `https://bhiss.pbh.gov.br/bhiss-web/` },
+    'CURITIBA':       { nome: 'CND Municipal Curitiba', desc: 'Secretaria Municipal de Finanças', url: c => `https://www.curitiba.pr.gov.br/servicos/certidao-negativa-de-debito-municipal/` },
+    'PORTO ALEGRE':   { nome: 'CND Municipal POA', desc: 'Secretaria Municipal da Fazenda', url: c => `https://www2.portoalegre.rs.gov.br/smf/certidao_negativa/` },
+    'SALVADOR':       { nome: 'CND Municipal Salvador', desc: 'SEFAZ Municipal Salvador', url: c => `https://www.sefaz.salvador.ba.gov.br/` },
+    'CAMPINAS':       { nome: 'CND Municipal Campinas', desc: 'Secretaria Municipal de Finanças', url: c => `https://www.campinas.sp.gov.br/servicos/certidao-negativa-de-debitos/` },
+    'RECIFE':         { nome: 'CND Municipal Recife', desc: 'Secretaria de Finanças Recife', url: c => `https://www.recife.pe.gov.br/servicos/certidao-negativa/` },
+};
+
+function renderCertidoesEstaduais(uf, municipio, cnpj) {
+    const container = $('cert-estaduais');
+    const lista     = $('cert-estaduais-lista');
+    if (!container || !lista) return;
+
+    const itens = [];
+
+    // Certidões do estado
+    const estaduais = CERT_ESTADUAIS[uf] || [];
+    estaduais.forEach(c => itens.push({ ...c, url: c.url(cnpj) }));
+
+    // Certidão municipal se município conhecido
+    const munKey = Object.keys(CERT_MUNICIPAIS).find(k =>
+        (municipio || '').toUpperCase().includes(k) || k.includes((municipio || '').toUpperCase())
+    );
+    if (munKey) {
+        const cm = CERT_MUNICIPAIS[munKey];
+        itens.push({ nome: cm.nome, desc: cm.desc, url: cm.url(cnpj) });
+    }
+
+    // Se não tem estado mapeado, mostra link genérico de junta comercial
+    if (!estaduais.length) {
+        itens.push({
+            nome: `Junta Comercial (${uf})`,
+            desc: 'Atos constitutivos da empresa',
+            url: `https://www.gov.br/pt-br/orgaos/juntas-comerciais`
+        });
+        itens.push({
+            nome: `SEFAZ ${uf}`,
+            desc: 'Certidão negativa estadual',
+            url: `https://www.google.com/search?q=certidao+negativa+estadual+${uf}+CNPJ+${cnpj}`
+        });
+    }
+
+    lista.innerHTML = itens.map(item => `
+        <button class="cnpj-link-btn" onclick="window.open('${item.url}','_blank')">
+            <span>🗺️</span>
+            <div>
+                <div style="font-weight:600;font-size:.875rem;">${item.nome}</div>
+                <div style="font-size:.72rem;color:var(--gray-500);">${item.desc}</div>
+            </div>
+            <span style="margin-left:auto;color:var(--blue-500);">↗</span>
+        </button>`).join('');
+
+    container.style.display = 'block';
+}
+
+
+function mascaraCNPJ(el) {
+    let v = el.value.replace(/\D/g,'').substring(0,14);
+    if (v.length > 12) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2}).*/,'$1.$2.$3/$4-$5');
+    else if (v.length > 8) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{0,4}).*/,'$1.$2.$3/$4');
+    else if (v.length > 5) v = v.replace(/^(\d{2})(\d{3})(\d{0,3}).*/,'$1.$2.$3');
+    else if (v.length > 2) v = v.replace(/^(\d{2})(\d{0,3}).*/,'$1.$2');
+    el.value = v;
+}
+
+function limparCNPJ() {
+    const el = $('cnpj-input');
+    if (el) el.value = '';
+    const card = $('emp-card');
+    if (card) card.classList.remove('visible');
+    const st = $('cnpj-status');
+    if (st) st.style.display = 'none';
+    const est = $('cert-estaduais');
+    if (est) est.style.display = 'none';
+}
+
+async function buscarCNPJ() {
+    const raw = ($('cnpj-input')?.value || '').replace(/\D/g,'');
+    if (raw.length !== 14) { toast('CNPJ deve ter 14 dígitos.', 'error'); return; }
+
+    const btn = $('cnpj-btn');
+    const st  = $('cnpj-status');
+    btn.disabled = true; btn.textContent = '⏳';
+    $('emp-card').classList.remove('visible');
+
+    st.style.cssText = 'display:block;margin-bottom:14px;padding:12px 16px;border-radius:8px;font-size:.875rem;background:#f0f7ff;border:1px solid #b3d4f0;color:#004b87;';
+    st.innerHTML = '⏳ Consultando Receita Federal…';
+
+    try {
+        const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${raw}`);
+        const d   = await res.json();
+
+        if (!res.ok || d.message) {
+            st.style.cssText = 'display:block;margin-bottom:14px;padding:12px 16px;border-radius:8px;font-size:.875rem;background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;';
+            st.innerHTML = '❌ ' + (d.message || 'CNPJ não encontrado.');
+            return;
+        }
+
+        st.style.display = 'none';
+        const nome       = d.razao_social || '—';
+        const nomeFantasia = d.nome_fantasia || '';
+        $('emp-av').textContent       = nome[0].toUpperCase();
+        $('emp-nome').textContent     = nome;
+        $('emp-cnpj-txt').textContent = d.cnpj || raw;
+
+        const sit   = (d.descricao_situacao_cadastral || '').toLowerCase();
+        const ativa = sit.includes('ativa');
+        const cls   = ativa ? 'ativa' : sit.includes('suspens') ? 'suspensa' : 'inativa';
+
+        // Badges múltiplos
+        let badges = `<span class="emp-badge ${cls}">${ativa?'✅':'❌'} ${d.descricao_situacao_cadastral||'—'}</span>`;
+        if (d.descricao_identificador_matriz_filial) badges += ` <span class="emp-badge" style="background:#e0f2fe;color:#0369a1;">${d.descricao_identificador_matriz_filial}</span>`;
+        if (d.opcao_pelo_simples) badges += ` <span class="emp-badge" style="background:#dcfce7;color:#166534;">Simples Nacional</span>`;
+        if (d.opcao_pelo_mei)    badges += ` <span class="emp-badge" style="background:#fef9c3;color:#854d0e;">MEI</span>`;
+        $('emp-status-badge').innerHTML = badges;
+
+        // Regime tributário
+        const regimes = d.regime_tributario || [];
+        const regimeStr = regimes.length
+            ? regimes.map(r => r.regime_tributario_descricao || r.descricao || '').filter(Boolean).slice(0,2).join(', ')
+            : (d.opcao_pelo_simples ? 'Simples Nacional' : d.opcao_pelo_mei ? 'MEI' : '—');
+
+        const campos = [
+            { l:'Nome Fantasia',          v: nomeFantasia || '(não informado)' },
+            { l:'Natureza Jurídica',      v: d.descricao_natureza_juridica || '—' },
+            { l:'Porte',                  v: d.porte || '—' },
+            { l:'Regime Tributário',      v: regimeStr },
+            { l:'Data de Abertura',       v: d.data_inicio_atividade || '—' },
+            { l:'Situação desde',         v: d.data_situacao_cadastral || '—' },
+            { l:'Motivo da Situação',     v: d.descricao_motivo_situacao_cadastral || '—' },
+            { l:'Capital Social',         v: d.capital_social ? 'R$ '+Number(d.capital_social).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—' },
+            { l:'Telefone 1',             v: d.ddd_telefone_1 ? `(${d.ddd_telefone_1}) ${d.telefone_1||''}` : '—' },
+            { l:'Telefone 2',             v: d.ddd_telefone_2 ? `(${d.ddd_telefone_2}) ${d.telefone_2||''}` : '—' },
+            { l:'Fax',                    v: d.ddd_fax ? `(${d.ddd_fax}) ${d.telefone_fax||''}` : '—' },
+            { l:'E-mail',                 v: d.email || '—' },
+            { l:'Logradouro',             v: [d.descricao_tipo_de_logradouro, d.logradouro, d.numero, d.complemento].filter(Boolean).join(' ') || '—' },
+            { l:'Bairro',                 v: d.bairro || '—' },
+            { l:'Município / UF',         v: `${d.municipio||'—'} / ${d.uf||'—'}` },
+            { l:'CEP',                    v: d.cep || '—' },
+            { l:'País',                   v: d.pais || 'Brasil' },
+            { l:'Situação Especial',      v: d.situacao_especial || d.descricao_situacao_especial || 'Nenhuma' },
+            { l:'Ente Federativo Resp.',  v: d.ente_federativo_responsavel || '—' },
+        ];
+
+        $('emp-grid').innerHTML = campos
+            .filter(c => c.v && c.v !== '—' && c.v !== '(não informado)')
+            .map(c=>`<div class="emp-field"><label>${c.l}</label><span>${c.v}</span></div>`).join('');
+
+        // Sócios com representante legal
+        const socios = d.qsa || [];
+        $('emp-socios').innerHTML = socios.length ? `
+            <h4>👥 Quadro Societário — ${socios.length} membro${socios.length>1?'s':''}</h4>
+            ${socios.map(s=>`<div class="socio-item">
+                <div class="socio-icon">${(s.nome_socio||'?')[0].toUpperCase()}</div>
+                <div style="flex:1;">
+                    <div class="socio-nome">${s.nome_socio||'—'}</div>
+                    <div class="socio-qual">${s.qualificacao_socio||'—'}${s.data_entrada_sociedade?' · Desde '+s.data_entrada_sociedade:''}</div>
+                    ${s.nome_representante_legal ? `<div style="font-size:.72rem;color:var(--blue-700);margin-top:2px;">👤 Representante: ${s.nome_representante_legal}</div>` : ''}
+                    ${s.qualificacao_representante_legal ? `<div style="font-size:.72rem;color:var(--gray-500);">${s.qualificacao_representante_legal}</div>` : ''}
+                </div>
+            </div>`).join('')}` : '';
+
+        // CNAEs com todos os secundários
+        const cnaes = d.cnaes_secundarios || [];
+        $('emp-cnaes').innerHTML = `
+            <h4>🏭 CNAE Principal${cnaes.length?' + '+cnaes.length+' Secundário'+(cnaes.length>1?'s':''):''}</h4>
+            <div class="cnae-item" style="background:var(--blue-50);border-radius:6px;padding:8px;margin-bottom:4px;">
+                <strong style="color:var(--blue-700);">${d.cnae_fiscal||'—'}</strong> ${d.cnae_fiscal_descricao||'—'}
+                <em style="color:var(--blue-500);font-size:.72rem;"> · principal</em>
+            </div>
+            ${cnaes.map(c=>`<div class="cnae-item"><strong>${c.codigo||'—'}</strong> ${c.descricao||'—'}</div>`).join('')}`;
+
+        $('emp-card').classList.add('visible');
+        $('emp-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        toast(`${nome} encontrada! ✔`);
+
+        // Renderiza certidões estaduais e municipais dinamicamente
+        renderCertidoesEstaduais(d.uf || '', d.municipio || '', raw);
+
+    } catch(err) {
+        st.style.cssText = 'display:block;margin-bottom:14px;padding:12px 16px;border-radius:8px;font-size:.875rem;background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;';
+        st.innerHTML = '❌ Erro: ' + err.message;
+    } finally {
+        btn.disabled = false; btn.textContent = '🔍 Buscar';
+    }
+}
+
+function abrirConsulta(tipo) {
+    const cnpj = ($('cnpj-input')?.value || '').replace(/\D/g,'');
+
+    const urls = {
+        receita: `https://servicos.receita.fazenda.gov.br/Servicos/cnpjreva/Cnpjreva_Solicitacao2.asp?cnpj=${cnpj}`,
+        simples: `https://www8.receita.fazenda.gov.br/SimplesNacional/aplicacoes.aspx?id=21`,
+        rfpgfn:  `https://solucoes.receita.fazenda.gov.br/Servicos/certidaointernet/PJ/Emitir?tipo=U&cnpj=${cnpj}`,
+        fgts:    `https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf`,
+        inss:    `https://www.previdencia.gov.br/servicos-ao-cidadao/todos-os-servicos/certidao-negativa/`,
+        tst:     `https://cndt-certidao.tst.jus.br/inicio.faces`,
+        ceis:    `https://portaldatransparencia.gov.br/sancoes/ceis?cpfCnpj=${cnpj}`,
+        cnep:    `https://portaldatransparencia.gov.br/sancoes/cnep?cpfCnpj=${cnpj}`,
+        cadin:   `https://cadin.tesouro.gov.br/cadin-internet/`,
+        tcu:     `https://certidoes-apf.apps.tcu.gov.br/`,
+        sicaf:   `https://sicaf.serpro.gov.br/`,
+        pncp:    `https://pncp.gov.br/app/empresas/${cnpj}`,
+        jucerja: `https://www.jucerja.rj.gov.br/`,
+        trt:     `https://www.trt1.jus.br/certidao-negativa`,
+    };
+
+    const url = urls[tipo];
+    if (url) window.open(url, '_blank');
+}
+
+
+let _currentUser = null;
+
+function switchLoginTab(tab) {
+    $('tab-entrar').classList.toggle('active', tab === 'entrar');
+    $('tab-cadastro').classList.toggle('active', tab === 'cadastro');
+    $('form-entrar').style.display   = tab === 'entrar'   ? 'block' : 'none';
+    $('form-cadastro').style.display = tab === 'cadastro' ? 'block' : 'none';
+    $('login-error').classList.remove('visible');
+    $('login-success').classList.remove('visible');
+}
+
+function showLoginError(msg) {
+    const el = $('login-error');
+    el.textContent = msg;
+    el.classList.add('visible');
+    $('login-success').classList.remove('visible');
+}
+function showLoginSuccess(msg) {
+    const el = $('login-success');
+    el.textContent = msg;
+    el.classList.add('visible');
+    $('login-error').classList.remove('visible');
+}
+
+async function fazerLogin() {
+    const email = $('login-email').value.trim();
+    const senha = $('login-senha').value;
+    if (!email || !senha) { showLoginError('Preencha e-mail e senha.'); return; }
+    const btn = $('btn-login');
+    btn.disabled = true; btn.textContent = '⏳ Entrando…';
+    const { error } = await supa.auth.signInWithPassword({ email, password: senha });
+    btn.disabled = false; btn.textContent = 'Entrar';
+    if (error) { showLoginError('E-mail ou senha inválidos.'); return; }
+}
+
+async function fazerCadastro() {
+    const nome  = $('cadastro-nome').value.trim();
+    const email = $('cadastro-email').value.trim();
+    const senha = $('cadastro-senha').value;
+    if (!nome || !email || !senha) { showLoginError('Preencha todos os campos.'); return; }
+    if (senha.length < 6) { showLoginError('A senha deve ter pelo menos 6 caracteres.'); return; }
+    const btn = $('btn-cadastro');
+    btn.disabled = true; btn.textContent = '⏳ Criando conta…';
+    const { error } = await supa.auth.signUp({
+        email, password: senha,
+        options: { data: { full_name: nome } }
+    });
+    btn.disabled = false; btn.textContent = 'Criar Conta';
+    if (error) { showLoginError(error.message); return; }
+    showLoginSuccess('✅ Conta criada! Verifique seu e-mail para confirmar, depois entre.');
+}
+
+async function fazerLogout() {
+    await supa.auth.signOut();
+}
+
+function entrarNoSistema(user) {
+    _currentUser = user;
+    const email = user.email || '';
+    const nome  = user.user_metadata?.full_name || email;
+    $('user-email').textContent  = nome;
+    $('user-avatar').textContent = (nome[0] || '?').toUpperCase();
+    $('login-screen').classList.remove('visible');
+    updateProgress();
+}
+
+function sairDoSistema() {
+    _currentUser = null;
+    $('login-screen').classList.add('visible');
+    $('login-email').value = '';
+    $('login-senha').value = '';
+    $('login-error').classList.remove('visible');
+    $('login-success').classList.remove('visible');
+    // Limpa o formulário e a tabela
+    clearFormSilent();
+    clearEditMode();
+    $('table-body').innerHTML = '';
+    openTab('form');
+}
+
+// Escuta mudanças de sessão
+supa.auth.onAuthStateChange((event, session) => {
+    if (session?.user) {
+        entrarNoSistema(session.user);
+    } else {
+        sairDoSistema();
+    }
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────
+// Garante que apenas page-form está visível
+['list','prazos','cnpj'].forEach(t => {
+    const el = document.getElementById('page-' + t);
+    if (el) el.style.display = 'none';
+});
+updateProgress();
+// Verifica se já tem sessão ativa
+supa.auth.getSession().then(({ data: { session } }) => {
+    if (session?.user) entrarNoSistema(session.user);
+});
+</script>
+</body>
+</html>
